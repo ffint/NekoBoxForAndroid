@@ -4,8 +4,8 @@ const val CONNECTION_TEST_URL = "http://cp.cloudflare.com/"
 
 object Key {
 
-    const val DB_PUBLIC = "configuration.db"
-    const val DB_PROFILE = "sager_net.db"
+    const val DB_PUBLIC = "configuration_enhanced.db"
+    const val DB_PROFILE = "nekobox_enhanced.db"
 
     const val PERSIST_ACROSS_REBOOT = "isAutoConnect"
 
@@ -169,6 +169,7 @@ object IPv6Mode {
 object GroupType {
     const val BASIC = 0
     const val SUBSCRIPTION = 1
+    const val SMART = 2
 }
 
 object GroupOrder {
@@ -178,10 +179,10 @@ object GroupOrder {
 }
 
 object Action {
-    const val SERVICE = "io.nekohasekai.sagernet.SERVICE"
-    const val CLOSE = "io.nekohasekai.sagernet.CLOSE"
-    const val RELOAD = "io.nekohasekai.sagernet.RELOAD"
+    const val SERVICE = "moe.nb4a.enhanced.SERVICE"
+    const val CLOSE = "moe.nb4a.enhanced.CLOSE"
+    const val RELOAD = "moe.nb4a.enhanced.RELOAD"
 
-    // const val SWITCH_WAKE_LOCK = "io.nekohasekai.sagernet.SWITCH_WAKELOCK"
-    const val RESET_UPSTREAM_CONNECTIONS = "moe.nb4a.RESET_UPSTREAM_CONNECTIONS"
+    // Keep Enhanced broadcasts isolated from the official NekoBox process.
+    const val RESET_UPSTREAM_CONNECTIONS = "moe.nb4a.enhanced.RESET_UPSTREAM_CONNECTIONS"
 }

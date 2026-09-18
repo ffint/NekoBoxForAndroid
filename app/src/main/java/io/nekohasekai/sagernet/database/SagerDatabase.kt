@@ -37,7 +37,6 @@ abstract class SagerDatabase : RoomDatabase() {
                 .setJournalMode(JournalMode.TRUNCATE)
                 .allowMainThreadQueries()
                 .enableMultiInstanceInvalidation()
-                .fallbackToDestructiveMigration()
                 .setQueryExecutor { GlobalScope.launch { it.run() } }
                 .build()
         }
