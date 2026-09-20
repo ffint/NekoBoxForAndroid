@@ -93,19 +93,13 @@ printf 'sdk.dir=%s\nndk.dir=%s\n' "${ANDROID_HOME}" "${NDK_DIR}" > local.propert
 ./run init action gradle
 ./run lib core
 
-GROUP_PATH="${GROUP//.//}"
-M2_DIR="${HOME}/.m2/repository/${GROUP_PATH}/${ARTIFACT}/${VERSION}"
-mkdir -p "${M2_DIR}"
-cp app/libs/libcore.aar "${M2_DIR}/${ARTIFACT}-${VERSION}.aar"
-cat > "${M2_DIR}/${ARTIFACT}-${VERSION}.pom" <<EOF
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>${GROUP}</groupId>
-  <artifactId>${ARTIFACT}</artifactId>
-  <version>${VERSION}</version>
-  <packaging>aar</packaging>
-  <name>NekoBox Enhanced libcore QA cache</name>
-</project>
-EOF
-echo "libcore cache ready"
+mvn -q install:install-file \
+  -Dfile=app/libs/libcore.aar \
+  -DgroupId="${GROUP}" \
+  -DartifactId="${ARTIFACT}" \
+  -Dversion="${VERSION}" \
+  -Dpackaging=aar \
+  -DgeneratePom=true
+
+echo "libcore cache ready: ${GROUP}:${ARTIFACT}:${VERSION}"
 sha256sum app/libs/libcore.aar
