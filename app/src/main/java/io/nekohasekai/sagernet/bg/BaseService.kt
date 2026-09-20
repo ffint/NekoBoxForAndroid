@@ -17,6 +17,7 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.plugin.PluginManager
+import io.nekohasekai.sagernet.smart.SmartGroupManager
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -286,6 +287,9 @@ class BaseService {
                         Logs.d("Network changed: $oldName -> $upstreamInterfaceName")
                         if (DataStore.networkChangeResetConnections) {
                             Libcore.resetAllConnections(true)
+                        }
+                        runOnDefaultDispatcher {
+                            SmartGroupManager.onNetworkChanged()
                         }
                     }
                 }

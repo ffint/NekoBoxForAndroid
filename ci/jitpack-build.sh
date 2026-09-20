@@ -109,17 +109,25 @@ fi
 GROUP_PATH="${GROUP//.//}"
 M2_DIR="${HOME}/.m2/repository/${GROUP_PATH}/${ARTIFACT}/${VERSION}"
 mkdir -p "${M2_DIR}"
-cp "${APK}" "${M2_DIR}/${ARTIFACT}-${VERSION}.apk"
+# JitPack only indexes normal Maven artifacts (jar/aar). Keep the APK bytes
+# unchanged, but publish that exact file under a .jar extension so JitPack can
+# expose it. Consumers/download automation rename it back to .apk.
+cp "${APK}" "${M2_DIR}/${ARTIFACT}-${VERSION}.jar"
 cat > "${M2_DIR}/${ARTIFACT}-${VERSION}.pom" <<EOF
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
   <groupId>${GROUP}</groupId>
   <artifactId>${ARTIFACT}</artifactId>
   <version>${VERSION}</version>
-  <packaging>apk</packaging>
+  <packaging>jar</packaging>
   <name>NekoBox Enhanced QA APK</name>
 </project>
 EOF
 
+# JitPack also expects a project POM when using a custom install command.
+cp "${M2_DIR}/${ARTIFACT}-${VERSION}.pom" pom.xml
+
 echo "QA APK: ${APK}"
 sha256sum "${APK}"
+echo "Published Maven wrapper:"
+ls -lh "${M2_DIR}/${ARTIFACT}-${VERSION}.jar" "${M2_DIR}/${ARTIFACT}-${VERSION}.pom"

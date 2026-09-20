@@ -81,6 +81,28 @@ object SmartGroupManager {
         return results
     }
 
+    suspend fun onNetworkChanged() {
+        val profileId = DataStore.currentProfile
+        if (profileId <= 0L || !DataStore.serviceState.canStop) return
+
+        val profile = SagerDatabase.proxyDao.getById(profileId) ?: return
+        val group = SagerDatabase.groupDao.getById(profile.groupId) ?: return
+        if (group.type != io.nekohasekai.sagernet.GroupType.SMART) return
+
+        val config = getOrCreateConfig(group.id)
+        if (!config.enabled) return
+
+        Logs.i("Smart Group network change check: groupId=" + group.id)
+        // Network transitions can invalidate a previously good CF path.
+        // Re-check all candidates with lightweight RTT only; throughput
+        // remains on the low-frequency background cadence.
+        testGroup(
+            group.id,
+            includeThroughput = false,
+            fullThroughput = false,
+        )
+    }
+
     fun evaluateAndSwitch(
         groupId: Long,
         now: Long = System.currentTimeMillis(),
