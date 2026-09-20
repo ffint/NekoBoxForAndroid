@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet.database
 
-import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -33,7 +32,7 @@ data class SmartGroupConfig(
     var stabilityWeight: Double = 0.30,
     var failureWeight: Double = 0.06,
 ) {
-    @Dao
+    @androidx.room.Dao
     interface Dao {
         @Query("SELECT * FROM smart_group_config WHERE groupId = :groupId")
         fun get(groupId: Long): SmartGroupConfig?

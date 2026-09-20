@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet.database
 
-import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -29,7 +28,7 @@ data class SmartNodeMetric(
     var score: Double = 0.0,
     var lastError: String? = null,
 ) {
-    @Dao
+    @androidx.room.Dao
     interface Dao {
         @Query("SELECT * FROM smart_node_metrics WHERE groupId = :groupId ORDER BY score DESC")
         fun byGroup(groupId: Long): List<SmartNodeMetric>
