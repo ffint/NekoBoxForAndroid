@@ -22,6 +22,10 @@ object Key {
     const val DIRECT_DNS = "directDns"
     const val ENABLE_DNS_ROUTING = "enableDnsRouting"
     const val ENABLE_FAKEDNS = "enableFakeDns"
+    const val STRICT_PRIVACY_MODE = "strictPrivacyMode"
+    const val STRICT_VPN_LOCKDOWN = "strictVpnLockdown"
+    const val ENABLE_BLOCK_RULESETS = "enableBlockRuleSets"
+    const val BLOCK_RULESETS = "blockRuleSets"
 
     const val IPV6_MODE = "ipv6Mode"
 

@@ -117,6 +117,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var directDns by configurationStore.string(Key.DIRECT_DNS) { "https://223.5.5.5/dns-query" }
     var enableDnsRouting by configurationStore.boolean(Key.ENABLE_DNS_ROUTING) { true }
     var enableFakeDns by configurationStore.boolean(Key.ENABLE_FAKEDNS) { true }
+    var strictPrivacyMode by configurationStore.boolean(Key.STRICT_PRIVACY_MODE) { false }
+    var enableBlockRuleSets by configurationStore.boolean(Key.ENABLE_BLOCK_RULESETS) { false }
+    var blockRuleSets by configurationStore.string(Key.BLOCK_RULESETS) {
+        "geosite:category-ads-all"
+    }
 
     var rulesProvider by configurationStore.stringToInt(Key.RULES_PROVIDER)
     var logLevel by configurationStore.stringToInt(Key.LOG_LEVEL)

@@ -40,6 +40,8 @@
     <string name="group_status_proxies">%d Proxies</string>
     <string name="group_status_smart">%d Proxies · Smart selection</string>
     <string name="smart_test">Test</string>
+    <string name="smart_node_status">Score %1$.0f · RTT %2$.0f ms · %3$.1f Mbps</string>
+    <string name="smart_node_status_failures">Score %1$.0f · RTT %2$.0f ms · %3$.1f Mbps · Fail %4$d</string>
     <string name="group_status_proxies_subscription">%d Proxies | Updated on %s</string>
     <string name="group_no_difference">%s: No difference</string>
     <string name="group_updated">%s: Updated %d proxies</string>
@@ -554,6 +556,14 @@
     <string name="bypass_lan_in_core">Bypass LAN in Core</string>
     <string name="need_restart">Restart APP to apply changes</string>
     <string name="use_selector">Use selector</string>
+    <string name="strict_privacy">Strict privacy for VPN traffic</string>
+    <string name="strict_privacy_summary">Force traffic captured by the VPN through the proxy before normal bypass rules, capture IPv6, and keep remote DNS on the proxy path.</string>
+    <string name="strict_vpn_lockdown">System VPN lockdown</string>
+    <string name="strict_vpn_lockdown_summary">Open Android VPN settings. For fail-close even if NekoBox is killed, enable Always-on VPN and Block connections without VPN.</string>
+    <string name="block_rulesets">Block rule sets</string>
+    <string name="block_rulesets_summary">Reject matching traffic and DNS queries before strict proxy routing.</string>
+    <string name="block_rulesets_entries">Blocking rule sets</string>
+    <string name="block_rulesets_entries_summary">One per line: geosite:/geoip: entries or remote sing-box .srs URLs.</string>
     <string name="front_proxy">Front proxy</string>
     <string name="landing_proxy">Landing Proxy</string>
     <string name="action_shadowtls" translatable="false">ShadowTLS</string>

@@ -30,6 +30,17 @@ object SmartGroupManager {
         SagerDatabase.smartGroupDao.upsert(config)
     }
 
+    fun markManualSelection(
+        groupId: Long,
+        proxyId: Long,
+        now: Long = System.currentTimeMillis(),
+    ) {
+        val config = getOrCreateConfig(groupId)
+        config.currentProxyId = proxyId
+        config.lastSwitchAt = now
+        SagerDatabase.smartGroupDao.upsert(config)
+    }
+
     suspend fun testNode(
         profile: ProxyEntity,
         includeThroughput: Boolean = false,

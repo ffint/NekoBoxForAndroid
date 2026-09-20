@@ -98,6 +98,16 @@
 
     <PreferenceCategory app:title="@string/cag_route">
         <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_action_lock"
+            app:key="strictPrivacyMode"
+            app:summary="@string/strict_privacy_summary"
+            app:title="@string/strict_privacy" />
+        <Preference
+            app:key="strictVpnLockdown"
+            app:summary="@string/strict_vpn_lockdown_summary"
+            app:title="@string/strict_vpn_lockdown" />
+        <SwitchPreference
             app:icon="@drawable/ic_navigation_apps"
             app:key="proxyApps"
             app:summary="@string/proxied_apps_summary"
@@ -138,6 +148,17 @@
             app:key="rulesProvider"
             app:title="@string/route_rules_provider"
             app:useSimpleSummaryProvider="true" />
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_rule_folder_24"
+            app:key="enableBlockRuleSets"
+            app:summary="@string/block_rulesets_summary"
+            app:title="@string/block_rulesets" />
+        <EditTextPreference
+            app:defaultValue="geosite:category-ads-all"
+            app:key="blockRuleSets"
+            app:summary="@string/block_rulesets_entries_summary"
+            app:title="@string/block_rulesets_entries" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/cag_dns">

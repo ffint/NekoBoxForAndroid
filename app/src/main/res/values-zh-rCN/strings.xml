@@ -28,6 +28,8 @@
     <string name="group_status_proxies">%d 个配置</string>
     <string name="group_status_smart">%d 个节点 · 智能优选</string>
     <string name="smart_test">测速</string>
+    <string name="smart_node_status">评分 %1$.0f · RTT %2$.0f ms · %3$.1f Mbps</string>
+    <string name="smart_node_status_failures">评分 %1$.0f · RTT %2$.0f ms · %3$.1f Mbps · 连续失败 %4$d</string>
     <string name="group_status_proxies_subscription">%d 个配置 | 更新于 %s</string>
     <string name="group_no_difference">%s: 没有变化</string>
     <string name="group_updated">%s: 更新了 %d 个节点</string>
@@ -479,6 +481,14 @@
     <string name="ads">推广</string>
     <string name="need_restart">重新启动应用程序以应用更改</string>
     <string name="use_selector">启用 selector （免重载切换节点）</string>
+    <string name="strict_privacy">VPN 流量严格隐私</string>
+    <string name="strict_privacy_summary">对进入 VPN 的流量强制优先走代理，覆盖普通直连分流，同时接管 IPv6，并让远程 DNS 走代理链路。</string>
+    <string name="strict_vpn_lockdown">系统 VPN 锁定</string>
+    <string name="strict_vpn_lockdown_summary">打开 Android VPN 设置。若希望 NekoBox 被杀后也绝不直连，请开启“始终开启的 VPN”和“阻止未使用 VPN 的连接”。</string>
+    <string name="block_rulesets">规则集拦截</string>
+    <string name="block_rulesets_summary">在严格代理规则之前拦截匹配的网络请求和 DNS 查询。</string>
+    <string name="block_rulesets_entries">拦截规则集</string>
+    <string name="block_rulesets_entries_summary">每行一个：支持 geosite:/geoip: 或远程 sing-box .srs URL。</string>
     <string name="front_proxy">前置代理</string>
     <string name="landing_proxy">落地代理</string>
     <string name="protocol_version">协议版本</string>

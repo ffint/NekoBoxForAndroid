@@ -133,17 +133,73 @@ fun buildConfig(
     val domainListDNSDirectForce = mutableListOf<String>()
     val bypassDNSBeans = hashSetOf<AbstractBean>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
+    val strictPrivacy = DataStore.strictPrivacyMode && isVPN && !forTest
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST
     val remoteDns = DataStore.remoteDns.split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
     val directDNS = DataStore.directDns.split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
-    val enableDnsRouting = DataStore.enableDnsRouting
-    val useFakeDns = DataStore.enableFakeDns && !forTest
+    val enableDnsRouting = DataStore.enableDnsRouting || strictPrivacy
+    val useFakeDns = (DataStore.enableFakeDns || strictPrivacy) && !forTest
     val needSniff = DataStore.trafficSniffing > 0
     val needSniffOverride = DataStore.trafficSniffing == 2
     val externalIndexMap = ArrayList<IndexEntity>()
-    val ipv6Mode = if (forTest) IPv6Mode.ENABLE else DataStore.ipv6Mode
+    val ipv6Mode =
+        if (forTest || strictPrivacy) IPv6Mode.ENABLE else DataStore.ipv6Mode
+    val enhancedBlockEntries =
+        if (!forTest && DataStore.enableBlockRuleSets) {
+            DataStore.blockRuleSets.listByLineOrComma().map { it.trim() }
+                .filter { it.isNotBlank() && !it.startsWith("#") }
+                .distinct()
+        } else {
+            emptyList()
+        }
+
+    fun strictProtectedUids(): List<Int>? {
+        if (!strictPrivacy) return emptyList()
+        if (!DataStore.proxyApps) return null
+
+        PackageCache.awaitLoadSync()
+        val configured = DataStore.individual.split('\n')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .toSet()
+        val protectedPackages = if (DataStore.bypass) {
+            PackageCache.installedPackages.keys.filterNot { it in configured }
+        } else {
+            configured.toList()
+        }
+        return protectedPackages.mapNotNull { PackageCache[it] }.distinct()
+    }
+
+    val strictUids = strictProtectedUids()
+
+    fun enhancedBlockRuleSets(): Pair<List<String>, List<RuleSet>> {
+        val tags = ArrayList<String>()
+        val sets = ArrayList<RuleSet>()
+        enhancedBlockEntries.forEachIndexed { index, entry ->
+            when {
+                entry.startsWith("geosite:") || entry.startsWith("geoip:") -> {
+                    tags += entry
+                    generateRuleSet(listOf(entry), sets)
+                }
+
+                entry.startsWith("https://") || entry.startsWith("http://") -> {
+                    val tag = "enhanced-block-$index"
+                    tags += tag
+                    sets += RuleSet().apply {
+                        type = "remote"
+                        this.tag = tag
+                        format = "binary"
+                        url = entry
+                    }
+                }
+            }
+        }
+        return tags to sets
+    }
+
+    val (enhancedBlockTags, enhancedBlockSets) = enhancedBlockRuleSets()
 
     fun genDomainStrategy(noAsIs: Boolean): String {
         return when {
@@ -242,6 +298,27 @@ fun buildConfig(
             auto_detect_interface = true
             rules = mutableListOf()
             rule_set = mutableListOf()
+        }
+
+        if (enhancedBlockTags.isNotEmpty()) {
+            route.rule_set.addAll(enhancedBlockSets)
+            route.rules.add(Rule_DefaultOptions().apply {
+                rule_set = enhancedBlockTags
+                action = "reject"
+            })
+            userDNSRuleList += DNSRule_DefaultOptions().apply {
+                rule_set = enhancedBlockTags
+                server = "dns-block"
+                disable_cache = true
+            }
+        }
+
+        if (strictPrivacy && (strictUids == null || strictUids.isNotEmpty())) {
+            route.rules.add(Rule_DefaultOptions().apply {
+                inbound = listOf("tun-in")
+                if (strictUids != null) user_id = strictUids
+                outbound = TAG_PROXY
+            })
         }
 
         // returns outbound tag
@@ -553,7 +630,9 @@ fun buildConfig(
 
                 when (rule.outbound) {
                     -1L -> {
-                        userDNSRuleList += makeDnsRuleObj().apply { server = "dns-direct" }
+                        userDNSRuleList += makeDnsRuleObj().apply {
+                            server = if (strictPrivacy) "dns-remote" else "dns-direct"
+                        }
                     }
 
                     0L -> {
@@ -668,6 +747,7 @@ fun buildConfig(
             if (!forTest) dns.servers.add(DNSServerOptions().apply {
                 address = it ?: throw Exception("No remote DNS, check your settings!")
                 tag = "dns-remote"
+                if (strictPrivacy) detour = TAG_PROXY
                 address_resolver = "dns-direct"
                 strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
             })

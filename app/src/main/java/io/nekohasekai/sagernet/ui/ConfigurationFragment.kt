@@ -77,6 +77,7 @@ import io.nekohasekai.sagernet.ktx.snackbar
 import io.nekohasekai.sagernet.ktx.startFilesForResult
 import io.nekohasekai.sagernet.ktx.tryToShow
 import io.nekohasekai.sagernet.plugin.PluginManager
+import io.nekohasekai.sagernet.smart.SmartGroupManager
 import io.nekohasekai.sagernet.ui.profile.ChainSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HttpSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HysteriaSettingsActivity
@@ -1504,6 +1505,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 update = DataStore.selectedProxy != proxyEntity.id
                                 lastSelected = DataStore.selectedProxy
                                 DataStore.selectedProxy = proxyEntity.id
+                                if (proxyGroup.type == GroupType.SMART) {
+                                    SmartGroupManager.markManualSelection(
+                                        proxyGroup.id,
+                                        proxyEntity.id,
+                                    )
+                                }
                                 onMainDispatcher {
                                     selectedView.visibility = View.VISIBLE
                                 }
@@ -1589,6 +1596,46 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 } else {
                     profileStatus.setOnClickListener(null)
+                }
+
+                if (proxyGroup.type == GroupType.SMART) {
+                    SagerDatabase.smartNodeDao.get(proxyEntity.id)?.takeIf {
+                        it.lastTestAt > 0L
+                    }?.let { metric ->
+                        profileStatus.text = if (metric.consecutiveFailures > 0) {
+                            getString(
+                                R.string.smart_node_status_failures,
+                                metric.score,
+                                metric.averageLatencyMs.coerceAtLeast(0.0),
+                                metric.downloadMbps.coerceAtLeast(0.0),
+                                metric.consecutiveFailures,
+                            )
+                        } else {
+                            getString(
+                                R.string.smart_node_status,
+                                metric.score,
+                                metric.averageLatencyMs.coerceAtLeast(0.0),
+                                metric.downloadMbps.coerceAtLeast(0.0),
+                            )
+                        }
+                        profileStatus.setTextColor(
+                            requireContext().getColour(
+                                if (metric.consecutiveFailures > 0) {
+                                    R.color.material_red_500
+                                } else {
+                                    R.color.material_green_500
+                                }
+                            )
+                        )
+                        val error = metric.lastError
+                        if (!error.isNullOrBlank()) {
+                            profileStatus.setOnClickListener {
+                                alert(error).tryToShow()
+                            }
+                        } else {
+                            profileStatus.setOnClickListener(null)
+                        }
+                    }
                 }
 
                 editButton.setOnClickListener {

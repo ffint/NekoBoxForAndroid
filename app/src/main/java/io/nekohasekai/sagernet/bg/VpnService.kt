@@ -95,7 +95,8 @@ class VpnService : BaseVpnService(),
         val builder = Builder().setConfigureIntent(SagerNet.configureIntent(this))
             .setSession(getString(R.string.app_name))
             .setMtu(DataStore.mtu)
-        val ipv6Mode = DataStore.ipv6Mode
+        val ipv6Mode =
+            if (DataStore.strictPrivacyMode) IPv6Mode.ENABLE else DataStore.ipv6Mode
 
         // address
         builder.addAddress(PRIVATE_VLAN4_CLIENT, 30)
@@ -105,7 +106,7 @@ class VpnService : BaseVpnService(),
         builder.addDnsServer(PRIVATE_VLAN4_ROUTER)
 
         // route
-        if (DataStore.bypassLan) {
+        if (DataStore.bypassLan && !DataStore.strictPrivacyMode) {
             resources.getStringArray(R.array.bypass_private_route).forEach {
                 val subnet = Subnet.fromString(it)!!
                 builder.addRoute(subnet.address.hostAddress!!, subnet.prefixSize)
