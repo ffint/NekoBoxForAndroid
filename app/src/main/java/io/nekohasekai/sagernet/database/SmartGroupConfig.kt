@@ -43,5 +43,19 @@ data class SmartGroupConfig(
 
         @Query("DELETE FROM smart_group_config WHERE groupId = :groupId")
         fun delete(groupId: Long)
+
+        @Query(
+            "UPDATE smart_group_config SET " +
+                "currentProxyId = CASE WHEN currentProxyId = :proxyId THEN 0 ELSE currentProxyId END, " +
+                "lockedProxyId = CASE WHEN lockedProxyId = :proxyId THEN 0 ELSE lockedProxyId END " +
+                "WHERE groupId = :groupId"
+        )
+        fun clearProxyReference(groupId: Long, proxyId: Long)
+
+        @Query(
+            "UPDATE smart_group_config SET currentProxyId = 0, lockedProxyId = 0, lastSwitchAt = 0 " +
+                "WHERE groupId = :groupId"
+        )
+        fun resetSelection(groupId: Long)
     }
 }

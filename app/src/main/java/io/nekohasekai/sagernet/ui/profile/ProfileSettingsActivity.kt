@@ -353,6 +353,10 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                                         val newGroupId = group.id
                                         ent.groupId = newGroupId
                                         SagerDatabase.smartNodeDao.delete(ent.id)
+                                        SagerDatabase.smartGroupDao.clearProxyReference(
+                                            oldGroupId,
+                                            ent.id,
+                                        )
                                         ProfileManager.updateProfile(ent)
                                         GroupManager.postUpdate(oldGroupId) // reload
                                         GroupManager.postUpdate(newGroupId)

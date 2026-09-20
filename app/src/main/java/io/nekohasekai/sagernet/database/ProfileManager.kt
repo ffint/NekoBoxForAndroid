@@ -100,6 +100,7 @@ object ProfileManager {
     suspend fun deleteProfile2(groupId: Long, profileId: Long) {
         if (SagerDatabase.proxyDao.deleteById(profileId) == 0) return
         SagerDatabase.smartNodeDao.delete(profileId)
+        SagerDatabase.smartGroupDao.clearProxyReference(groupId, profileId)
         if (DataStore.selectedProxy == profileId) {
             DataStore.selectedProxy = 0L
         }
@@ -108,6 +109,7 @@ object ProfileManager {
     suspend fun deleteProfile(groupId: Long, profileId: Long) {
         if (SagerDatabase.proxyDao.deleteById(profileId) == 0) return
         SagerDatabase.smartNodeDao.delete(profileId)
+        SagerDatabase.smartGroupDao.clearProxyReference(groupId, profileId)
         if (DataStore.selectedProxy == profileId) {
             DataStore.selectedProxy = 0L
         }

@@ -58,6 +58,7 @@ object GroupManager {
         DataStore.selectedProxy = 0L
         SagerDatabase.proxyDao.deleteAll(groupId)
         SagerDatabase.smartNodeDao.deleteByGroup(groupId)
+        SagerDatabase.smartGroupDao.resetSelection(groupId)
         iterator { groupUpdated(groupId) }
     }
 
