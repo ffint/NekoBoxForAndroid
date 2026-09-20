@@ -81,8 +81,6 @@ dependencies {
     implementation("androidx.room:room-runtime:2.7.2")
     ksp("androidx.room:room-compiler:2.7.2")
     implementation("androidx.room:room-ktx:2.7.2")
-    implementation("com.github.MatrixDev.Roomigrant:RoomigrantLib:0.3.4")
-    ksp("com.github.MatrixDev.Roomigrant:RoomigrantCompiler:0.3.4")
 
     testImplementation("junit:junit:4.13.2")
 
