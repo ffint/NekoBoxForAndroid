@@ -27,15 +27,34 @@ echo "ANDROID_HOME=${ANDROID_HOME:-}"
 NDK_VERSION="25.0.8775105"
 NDK_DIR="${ANDROID_HOME}/ndk/${NDK_VERSION}"
 if [ ! -f "${NDK_DIR}/source.properties" ]; then
-  SDKMANAGER="$(find "${ANDROID_HOME}" -type f -name sdkmanager 2>/dev/null | head -n 1 || true)"
-  if [ -z "${SDKMANAGER}" ]; then
-    echo "sdkmanager not found under ANDROID_HOME" >&2
-    exit 2
+  EXISTING_NDK="$(
+    find "${ANDROID_HOME}" -maxdepth 4 -type f -name source.properties 2>/dev/null |
+      while read -r source; do
+        if grep -q 'Pkg.Desc.*Android NDK' "${source}"; then
+          dirname "${source}"
+          break
+        fi
+      done
+  )"
+  if [ -n "${EXISTING_NDK}" ]; then
+    NDK_DIR="${EXISTING_NDK}"
+    echo "Using preinstalled NDK: ${NDK_DIR}"
+  else
+    NDK_CACHE="${HOME}/.cache/android-ndk-r25"
+    if [ ! -f "${NDK_CACHE}/source.properties" ]; then
+      mkdir -p "${HOME}/.cache"
+      curl -fL --retry 3         "https://dl.google.com/android/repository/android-ndk-r25-linux.zip"         -o /tmp/android-ndk-r25-linux.zip
+      rm -rf "${NDK_CACHE}"
+      unzip -q /tmp/android-ndk-r25-linux.zip -d "${HOME}/.cache"
+      mv "${HOME}/.cache/android-ndk-r25" "${NDK_CACHE}"
+    fi
+    NDK_DIR="${NDK_CACHE}"
+    echo "Downloaded NDK: ${NDK_DIR}"
   fi
-  yes | "${SDKMANAGER}" --licenses >/dev/null 2>&1 || true
-  "${SDKMANAGER}" "ndk;${NDK_VERSION}"
 fi
 
+export ANDROID_NDK_HOME="${NDK_DIR}"
+export NDK="${NDK_DIR}"
 printf 'sdk.dir=%s\nndk.dir=%s\n' "${ANDROID_HOME}" "${NDK_DIR}" > local.properties
 
 ./run init action gradle
