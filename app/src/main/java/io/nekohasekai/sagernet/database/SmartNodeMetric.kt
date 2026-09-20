@@ -2,16 +2,12 @@ package io.nekohasekai.sagernet.database
 
 import androidx.room.Dao
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 
-@Entity(
-    tableName = "smart_node_metrics",
-    indices = [Index(value = ["groupId"], name = "smartNodeGroupId")]
-)
+@Entity(tableName = "smart_node_metrics")
 data class SmartNodeMetric(
     @PrimaryKey var proxyId: Long = 0L,
     var groupId: Long = 0L,
