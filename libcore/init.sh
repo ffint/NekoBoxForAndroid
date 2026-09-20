@@ -6,6 +6,8 @@ rm -rf .build 2>/dev/null
 if [ -z "$GOPATH" ]; then
     GOPATH=$(go env GOPATH)
 fi
+export GOPATH
+export PATH="$GOPATH/bin:$PATH"
 
 # Install gomobile
 if [ ! -f "$GOPATH/bin/gomobile-matsuri" ]; then
@@ -25,4 +27,4 @@ if [ ! -f "$GOPATH/bin/gomobile-matsuri" ]; then
     mv "$GOPATH/bin/gobind" "$GOPATH/bin/gobind-matsuri"
 fi
 
-GOBIND=gobind-matsuri gomobile-matsuri init
+GOBIND=gobind-matsuri "$GOPATH/bin/gomobile-matsuri" init

@@ -95,9 +95,17 @@ object SmartGroupManager {
                 SagerDatabase.smartNodeDao.upsert(it)
             }
         }
+        val runningProfile = DataStore.currentProfile.takeIf { it > 0L }?.let {
+            SagerDatabase.proxyDao.getById(it)
+        }
+        val runningThisGroup =
+            DataStore.serviceState.canStop && runningProfile?.groupId == groupId
         val currentId = when {
+            runningThisGroup -> runningProfile!!.id
             config.currentProxyId > 0L -> config.currentProxyId
-            DataStore.selectedGroup == groupId && DataStore.selectedProxy > 0L -> DataStore.selectedProxy
+            !DataStore.serviceState.canStop &&
+                DataStore.selectedGroup == groupId &&
+                DataStore.selectedProxy > 0L -> DataStore.selectedProxy
             else -> 0L
         }
         val current = metrics.firstOrNull { it.proxyId == currentId }
@@ -109,15 +117,18 @@ object SmartGroupManager {
             config.lastSwitchAt = now
             SagerDatabase.smartGroupDao.upsert(config)
 
-            if (DataStore.selectedGroup == groupId) {
+            if (runningThisGroup) {
                 DataStore.selectedProxy = decision.toProxyId
                 DataStore.currentProfile = decision.toProxyId
-                if (DataStore.serviceState.canStop) {
-                    // Smart groups are always selector-backed. Existing
-                    // NekoBox reload() will hot-switch the selector whenever
-                    // the current running selector belongs to this group.
-                    SagerNet.reloadService()
-                }
+                // Smart groups are always selector-backed. Existing
+                // NekoBox reload() hot-switches the selector when the running
+                // selector belongs to this group.
+                SagerNet.reloadService()
+            } else if (!DataStore.serviceState.canStop && DataStore.selectedGroup == groupId) {
+                // When stopped, keep the UI selection aligned with the
+                // algorithm's current winner without affecting any live VPN.
+                DataStore.selectedProxy = decision.toProxyId
+                DataStore.currentProfile = decision.toProxyId
             }
             Logs.i(
                 "Smart Group switch: " + decision.fromProxyId + " -> " + decision.toProxyId +
