@@ -8,6 +8,8 @@ echo "commit: ${GIT_COMMIT:-unknown}"
 echo "branch: ${GIT_BRANCH:-unknown}"
 
 git submodule update --init --recursive
+find buildScript libcore -type f -name '*.sh' -exec chmod +x {} +
+chmod +x run gradlew
 
 if ! command -v go >/dev/null 2>&1 || ! go version | grep -q "go1.23.6"; then
   GO_ROOT="${HOME}/.cache/nekobox-go1.23.6"
