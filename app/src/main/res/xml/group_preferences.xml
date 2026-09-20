@@ -9,7 +9,7 @@
     <moe.matsuri.nb4a.ui.SimpleMenuPreference
         app:defaultValue="0"
         app:entries="@array/group_types"
-        app:entryValues="@array/int_array_2"
+        app:entryValues="@array/int_array_3"
         app:icon="@drawable/ic_baseline_layers_24"
         app:key="groupType"
         app:title="@string/group_type"
@@ -40,6 +40,86 @@
         app:key="groupLandingProxy"
         app:title="@string/landing_proxy"
         app:useSimpleSummaryProvider="true" />
+
+    <PreferenceCategory
+        app:key="groupSmart"
+        app:title="@string/smart_group_settings">
+
+        <SwitchPreference
+            app:key="groupSmartAutoSelect"
+            app:summary="@string/smart_auto_select_summary"
+            app:title="@string/smart_auto_select" />
+
+        <EditTextPreference
+            app:key="groupSmartLatencyUrl"
+            app:title="@string/smart_latency_url"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartThroughputUrl"
+            app:title="@string/smart_throughput_url"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartHealthInterval"
+            app:title="@string/smart_health_interval"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartThroughputInterval"
+            app:title="@string/smart_throughput_interval"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartSwitchDelta"
+            app:title="@string/smart_switch_delta"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartMinSwitchInterval"
+            app:title="@string/smart_min_switch_interval"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartFailureThreshold"
+            app:title="@string/smart_failure_threshold"
+            app:useSimpleSummaryProvider="true" />
+
+        <Preference
+            app:selectable="false"
+            app:title="@string/smart_scoring_weights" />
+
+        <EditTextPreference
+            app:key="groupSmartLatencyWeight"
+            app:title="@string/smart_weight_latency"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartJitterWeight"
+            app:title="@string/smart_weight_jitter"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartThroughputWeight"
+            app:title="@string/smart_weight_throughput"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartSuccessWeight"
+            app:title="@string/smart_weight_success"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartStabilityWeight"
+            app:title="@string/smart_weight_stability"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="groupSmartFailureWeight"
+            app:title="@string/smart_weight_failure"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
 
     <PreferenceCategory
         app:key="groupSubscription"

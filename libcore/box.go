@@ -2,15 +2,18 @@ package libcore
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"libcore/device"
 	"log"
+	"net/http"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/matsuridayo/libneko/protect_server"
 	"github.com/matsuridayo/libneko/speedtest"
@@ -232,6 +235,83 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 		connectionTracker = mainInstance.v2api.StatsService()
 	}
 	return speedtest.UrlTest(boxapi.CreateProxyHttpClient(mainInstance.Box, connectionTracker), link, timeout, speedtest.UrlTestStandard_RTT)
+}
+
+
+type throughputTestResult struct {
+	TTFBMillis     int64   `json:"ttfbMillis"`
+	Bytes          int64   `json:"bytes"`
+	DurationMillis int64   `json:"durationMillis"`
+	Mbps           float64 `json:"mbps"`
+}
+
+// ThroughputTestJSON performs a bounded HTTP download through the supplied
+// sing-box instance. A nil instance is intentionally rejected so Smart Group
+// measurements can never silently fall back to the device DIRECT network.
+func ThroughputTestJSON(i *BoxInstance, link string, timeout int32, maxBytes int64) (result string, err error) {
+	defer device.DeferPanicToError("box.ThroughputTest", func(err_ error) { err = err_ })
+	if i == nil || i.Box == nil {
+		return "", errors.New("proxy instance required")
+	}
+	if maxBytes <= 0 {
+		maxBytes = 256 * 1024
+	}
+	if timeout <= 0 {
+		timeout = 10000
+	}
+
+	var connectionTracker adapter.ConnectionTracker
+	if i.v2api != nil {
+		connectionTracker = i.v2api.StatsService()
+	}
+	client := boxapi.CreateProxyHttpClient(i.Box, connectionTracker)
+	client.Timeout = time.Duration(timeout) * time.Millisecond
+	defer client.CloseIdleConnections()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", maxBytes-1))
+	req.Header.Set("Accept-Encoding", "identity")
+
+	started := time.Now()
+	response, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+	ttfb := time.Since(started)
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return "", fmt.Errorf("unexpected HTTP status: %s", response.Status)
+	}
+
+	bodyStarted := time.Now()
+	n, err := io.Copy(io.Discard, io.LimitReader(response.Body, maxBytes))
+	if err != nil {
+		return "", err
+	}
+	bodyDuration := time.Since(bodyStarted)
+	if n <= 0 {
+		return "", errors.New("empty throughput response")
+	}
+	seconds := bodyDuration.Seconds()
+	if seconds <= 0 {
+		seconds = 0.001
+	}
+
+	payload, err := json.Marshal(throughputTestResult{
+		TTFBMillis:     ttfb.Milliseconds(),
+		Bytes:          n,
+		DurationMillis: time.Since(started).Milliseconds(),
+		Mbps:           float64(n*8) / seconds / 1_000_000,
+	})
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
 }
 
 var protectCloser io.Closer
