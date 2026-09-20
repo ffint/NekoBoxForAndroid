@@ -23,6 +23,7 @@ import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
 import io.nekohasekai.sagernet.fmt.toUniversalLink
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.smart.SmartGroupManager
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.QRCodeDialog
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
@@ -384,7 +385,10 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             itemView.setOnClickListener { }
 
             editButton.isGone = proxyGroup.ungrouped
-            updateButton.isInvisible = proxyGroup.type != GroupType.SUBSCRIPTION
+            updateButton.isInvisible = proxyGroup.type == GroupType.BASIC
+            updateButton.setText(
+                if (proxyGroup.type == GroupType.SMART) R.string.smart_test else R.string.group_update
+            )
             groupName.text = proxyGroup.displayName()
 
             editButton.setOnClickListener {
@@ -394,7 +398,23 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
 
             updateButton.setOnClickListener {
-                GroupUpdater.startUpdate(proxyGroup, true)
+                when (proxyGroup.type) {
+                    GroupType.SUBSCRIPTION -> GroupUpdater.startUpdate(proxyGroup, true)
+                    GroupType.SMART -> {
+                        updateButton.isEnabled = false
+                        runOnDefaultDispatcher {
+                            SmartGroupManager.testGroup(
+                                proxyGroup.id,
+                                includeThroughput = true,
+                                fullThroughput = false,
+                            )
+                            onMainDispatcher {
+                                updateButton.isEnabled = true
+                                bind(proxyGroup)
+                            }
+                        }
+                    }
+                }
             }
 
             optionsButton.setOnClickListener {
@@ -435,7 +455,10 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 }
 
                 subscriptionUpdateProgress.isVisible = false
-                updateButton.isInvisible = proxyGroup.type != GroupType.SUBSCRIPTION
+                updateButton.isInvisible = proxyGroup.type == GroupType.BASIC
+                updateButton.setText(
+                    if (proxyGroup.type == GroupType.SMART) R.string.smart_test else R.string.group_update
+                )
                 editButton.isGone = proxyGroup.ungrouped
             }
 
@@ -534,7 +557,14 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                                     "${date.month + 1} - ${date.date}"
                                 )
                             }
+                        }
 
+                        GroupType.SMART -> {
+                            groupStatus.text = if (size == 0L) {
+                                getString(R.string.group_status_empty)
+                            } else {
+                                getString(R.string.group_status_smart, size)
+                            }
                         }
                     }
                 }
