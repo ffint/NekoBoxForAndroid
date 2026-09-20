@@ -24,13 +24,14 @@ if ! command -v go >/dev/null 2>&1 || ! go version | grep -q "go1.23.6"; then
 fi
 
 echo "Go: $(go version)"
-echo "ANDROID_HOME=${ANDROID_HOME:-}"
+echo "JitPack ANDROID_HOME=${ANDROID_HOME:-}"
 
+BASE_ANDROID_HOME="${ANDROID_HOME}"
 NDK_VERSION="25.0.8775105"
-NDK_DIR="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+NDK_DIR="${BASE_ANDROID_HOME}/ndk/${NDK_VERSION}"
 if [ ! -f "${NDK_DIR}/source.properties" ]; then
   EXISTING_NDK="$(
-    find "${ANDROID_HOME}" -maxdepth 4 -type f -name source.properties 2>/dev/null |
+    find "${BASE_ANDROID_HOME}" -maxdepth 4 -type f -name source.properties 2>/dev/null |
       while read -r source; do
         if grep -q 'Pkg.Desc.*Android NDK' "${source}"; then
           dirname "${source}"
@@ -45,7 +46,9 @@ if [ ! -f "${NDK_DIR}/source.properties" ]; then
     NDK_CACHE="${HOME}/.cache/android-ndk-r25"
     if [ ! -f "${NDK_CACHE}/source.properties" ]; then
       mkdir -p "${HOME}/.cache"
-      curl -fL --retry 3         "https://dl.google.com/android/repository/android-ndk-r25-linux.zip"         -o /tmp/android-ndk-r25-linux.zip
+      curl -fL --retry 3 \
+        "https://dl.google.com/android/repository/android-ndk-r25-linux.zip" \
+        -o /tmp/android-ndk-r25-linux.zip
       rm -rf "${NDK_CACHE}"
       unzip -q /tmp/android-ndk-r25-linux.zip -d "${HOME}/.cache"
       mv "${HOME}/.cache/android-ndk-r25" "${NDK_CACHE}"
@@ -55,8 +58,36 @@ if [ ! -f "${NDK_DIR}/source.properties" ]; then
   fi
 fi
 
+SDK_ROOT="${HOME}/.cache/nekobox-android-sdk"
+CMDLINE_ROOT="${HOME}/.cache/nekobox-cmdline-tools"
+SDKMANAGER="${CMDLINE_ROOT}/latest/bin/sdkmanager"
+if [ ! -x "${SDKMANAGER}" ]; then
+  CMDLINE_ZIP="/tmp/android-commandlinetools.zip"
+  curl -fL --retry 3 \
+    "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip" \
+    -o "${CMDLINE_ZIP}"
+  echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583  ${CMDLINE_ZIP}" |
+    sha256sum -c -
+  rm -rf "${CMDLINE_ROOT}"
+  mkdir -p "${CMDLINE_ROOT}/latest"
+  unzip -q "${CMDLINE_ZIP}" -d /tmp/android-commandlinetools
+  mv /tmp/android-commandlinetools/cmdline-tools/* "${CMDLINE_ROOT}/latest/"
+fi
+
+mkdir -p "${SDK_ROOT}"
+if [ ! -f "${SDK_ROOT}/platforms/android-35/android.jar" ] ||
+   [ ! -x "${SDK_ROOT}/build-tools/35.0.1/aapt2" ]; then
+  yes | "${SDKMANAGER}" --sdk_root="${SDK_ROOT}" --licenses >/dev/null 2>&1 || true
+  "${SDKMANAGER}" --sdk_root="${SDK_ROOT}" \
+    "platforms;android-35" \
+    "build-tools;35.0.1"
+fi
+
+export ANDROID_HOME="${SDK_ROOT}"
+export ANDROID_SDK_ROOT="${SDK_ROOT}"
 export ANDROID_NDK_HOME="${NDK_DIR}"
 export NDK="${NDK_DIR}"
+echo "QA ANDROID_HOME=${ANDROID_HOME}"
 printf 'sdk.dir=%s\nndk.dir=%s\n' "${ANDROID_HOME}" "${NDK_DIR}" > local.properties
 
 ./run init action gradle

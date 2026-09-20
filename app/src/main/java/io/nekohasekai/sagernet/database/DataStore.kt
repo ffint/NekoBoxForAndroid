@@ -252,7 +252,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var groupSmartLatencyUrl by profileCacheStore.string(Key.GROUP_SMART_LATENCY_URL)
     var groupSmartThroughputUrl by profileCacheStore.string(Key.GROUP_SMART_THROUGHPUT_URL)
     var groupSmartHealthInterval by profileCacheStore.stringToInt(Key.GROUP_SMART_HEALTH_INTERVAL) { 15 }
-    var groupSmartThroughputInterval by profileCacheStore.stringToInt(Key.GROUP_SMART_THROUGHPUT_INTERVAL) { 60 }
+    var groupSmartThroughputInterval by profileCacheStore.stringToInt(Key.GROUP_SMART_THROUGHPUT_INTERVAL) { 120 }
     var groupSmartSwitchDelta by profileCacheStore.string(Key.GROUP_SMART_SWITCH_DELTA) { "8.0" }
     var groupSmartMinSwitchInterval by profileCacheStore.stringToInt(Key.GROUP_SMART_MIN_SWITCH_INTERVAL) { 120 }
     var groupSmartFailureThreshold by profileCacheStore.stringToInt(Key.GROUP_SMART_FAILURE_THRESHOLD) { 3 }
