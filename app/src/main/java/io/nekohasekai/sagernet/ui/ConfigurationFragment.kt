@@ -1602,7 +1602,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                     SagerDatabase.smartNodeDao.get(proxyEntity.id)?.takeIf {
                         it.lastTestAt > 0L
                     }?.let { metric ->
-                        profileStatus.text = if (metric.consecutiveFailures > 0) {
+                        val smartCurrentId =
+                            SagerDatabase.smartGroupDao.get(proxyGroup.id)?.currentProxyId ?: 0L
+                        val marker = if (smartCurrentId == proxyEntity.id) "★ " else ""
+                        profileStatus.text = marker + if (metric.consecutiveFailures > 0) {
                             getString(
                                 R.string.smart_node_status_failures,
                                 metric.score,

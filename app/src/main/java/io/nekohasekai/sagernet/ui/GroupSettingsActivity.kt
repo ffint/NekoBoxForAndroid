@@ -225,7 +225,7 @@ class GroupSettingsActivity(
         requireHttpUrl(Key.GROUP_SMART_LATENCY_URL)
         requireHttpUrl(Key.GROUP_SMART_THROUGHPUT_URL)
         requireInt(Key.GROUP_SMART_HEALTH_INTERVAL, 15, 1440)
-        requireInt(Key.GROUP_SMART_THROUGHPUT_INTERVAL, 5, 10080)
+        requireInt(Key.GROUP_SMART_THROUGHPUT_INTERVAL, 15, 10080)
         requireDouble(Key.GROUP_SMART_SWITCH_DELTA, 0.0, 100.0)
         requireInt(Key.GROUP_SMART_MIN_SWITCH_INTERVAL, 0, 86400)
         requireInt(Key.GROUP_SMART_FAILURE_THRESHOLD, 1, 20)

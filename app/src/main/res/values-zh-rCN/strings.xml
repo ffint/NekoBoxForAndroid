@@ -304,7 +304,7 @@
     <string name="smart_latency_url">延迟测试 URL</string>
     <string name="smart_throughput_url">下载测速 URL</string>
     <string name="smart_health_interval">健康检查间隔（分钟，最小 15）</string>
-    <string name="smart_throughput_interval">完整测速间隔（分钟）</string>
+    <string name="smart_throughput_interval">完整测速间隔（分钟，最小 15）</string>
     <string name="smart_switch_delta">切换分差阈值</string>
     <string name="smart_min_switch_interval">最小切换间隔（秒）</string>
     <string name="smart_failure_threshold">连续失败切换阈值</string>
