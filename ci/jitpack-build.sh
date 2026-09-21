@@ -11,11 +11,12 @@ git submodule update --init --recursive
 find buildScript libcore -type f -name '*.sh' -exec chmod +x {} +
 chmod +x run gradlew
 
-if ! command -v go >/dev/null 2>&1 || ! go version | grep -q "go1.23.6"; then
-  GO_ROOT="${HOME}/.cache/nekobox-go1.23.6"
+GO_VERSION="1.25.5"
+if ! command -v go >/dev/null 2>&1 || ! go version | grep -q "go${GO_VERSION}"; then
+  GO_ROOT="${HOME}/.cache/nekobox-go${GO_VERSION}"
   if [ ! -x "${GO_ROOT}/bin/go" ]; then
     mkdir -p "${HOME}/.cache"
-    curl -fsSL "https://go.dev/dl/go1.23.6.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
     rm -rf "${GO_ROOT}"
     mkdir -p "${GO_ROOT}"
     tar -xzf /tmp/go.tar.gz -C "${GO_ROOT}" --strip-components=1
