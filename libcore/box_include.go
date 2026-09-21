@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/adapter/certificate"
 	"github.com/sagernet/sing-box/adapter/endpoint"
 	"github.com/sagernet/sing-box/adapter/inbound"
 	"github.com/sagernet/sing-box/adapter/outbound"
@@ -83,8 +84,6 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 	tuic.RegisterOutbound(registry)
 	hysteria2.RegisterOutbound(registry)
 
-	wireguard.RegisterOutbound(registry)
-
 	return registry
 }
 
@@ -125,4 +124,8 @@ func nekoboxAndroidServiceRegistry() *service.Registry {
 	registry := service.NewRegistry()
 
 	return registry
+}
+
+func nekoboxAndroidCertificateProviderRegistry() *certificate.Registry {
+	return certificate.NewRegistry()
 }

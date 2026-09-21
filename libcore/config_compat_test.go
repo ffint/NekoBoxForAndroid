@@ -95,3 +95,51 @@ func TestMigrateLegacyInboundFields(t *testing.T) {
 		t.Fatalf("sniff rule missing: %#v", rules[1])
 	}
 }
+
+func TestMigrateLegacyWireGuardOutbound(t *testing.T) {
+	root := decodeCompatConfig(t, `{
+	  "outbounds":[
+	    {"type":"direct","tag":"direct"},
+	    {
+	      "type":"wireguard",
+	      "tag":"wg-out",
+	      "server":"wg.example.com",
+	      "server_port":51820,
+	      "local_address":["10.0.0.2/32","fd00::2/128"],
+	      "private_key":"private",
+	      "peer_public_key":"public",
+	      "pre_shared_key":"psk",
+	      "reserved":"AAEC",
+	      "mtu":1408,
+	      "detour":"direct"
+	    }
+	  ]
+	}`)
+
+	outbounds := root["outbounds"].([]any)
+	if len(outbounds) != 1 || outbounds[0].(map[string]any)["type"] != "direct" {
+		t.Fatalf("legacy WireGuard outbound was not removed: %#v", outbounds)
+	}
+	endpoints := root["endpoints"].([]any)
+	if len(endpoints) != 1 {
+		t.Fatalf("expected one WireGuard endpoint, got %d", len(endpoints))
+	}
+	endpoint := endpoints[0].(map[string]any)
+	if endpoint["type"] != "wireguard" || endpoint["tag"] != "wg-out" {
+		t.Fatalf("unexpected endpoint identity: %#v", endpoint)
+	}
+	peers := endpoint["peers"].([]any)
+	peer := peers[0].(map[string]any)
+	if peer["address"] != "wg.example.com" || peer["public_key"] != "public" {
+		t.Fatalf("WireGuard peer not migrated: %#v", peer)
+	}
+}
+
+func TestMigrateLegacyWireGuardRefusesLossyFields(t *testing.T) {
+	_, err := migrateLegacyConfig(`{
+	  "outbounds":[{"type":"wireguard","tag":"wg-out","server":"1.1.1.1","server_port":51820,"gso":true}]
+	}`)
+	if err == nil {
+		t.Fatal("expected legacy gso migration to fail explicitly")
+	}
+}

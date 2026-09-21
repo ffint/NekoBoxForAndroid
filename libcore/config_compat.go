@@ -23,6 +23,9 @@ func migrateLegacyConfig(config string) (string, error) {
 	if err := migrateLegacyDNS(root); err != nil {
 		return "", err
 	}
+	if err := migrateLegacyWireGuard(root); err != nil {
+		return "", err
+	}
 	migrateLegacyInboundFields(root)
 
 	data, err := json.Marshal(root)
@@ -245,6 +248,130 @@ func rewriteLegacyDNSRule(rule map[string]any, strategies, rcodes map[string]str
 	if strategy := strategies[server]; strategy != "" {
 		if _, exists := rule["strategy"]; !exists {
 			rule["strategy"] = strategy
+		}
+	}
+}
+
+func migrateLegacyWireGuard(root map[string]any) error {
+	rawOutbounds, _ := root["outbounds"].([]any)
+	if len(rawOutbounds) == 0 {
+		return nil
+	}
+
+	endpoints, _ := root["endpoints"].([]any)
+	modernOutbounds := make([]any, 0, len(rawOutbounds))
+	for _, rawOutbound := range rawOutbounds {
+		outbound, ok := asStringMap(rawOutbound)
+		if !ok || outbound["type"] != "wireguard" {
+			modernOutbounds = append(modernOutbounds, rawOutbound)
+			continue
+		}
+
+		if gso, _ := outbound["gso"].(bool); gso {
+			return fmt.Errorf("migrate WireGuard outbound: legacy gso=true has no 1.14 endpoint equivalent")
+		}
+		if network := outbound["network"]; network != nil {
+			switch value := network.(type) {
+			case string:
+				if value != "" {
+					return fmt.Errorf("migrate WireGuard outbound: legacy network=%q cannot be preserved safely", value)
+				}
+			case []any:
+				if len(value) > 0 {
+					return fmt.Errorf("migrate WireGuard outbound: legacy network restriction cannot be preserved safely")
+				}
+			}
+		}
+
+		endpoint := map[string]any{"type": "wireguard"}
+		copyFields(endpoint, outbound,
+			"tag",
+			"detour",
+			"bind_interface",
+			"inet4_bind_address",
+			"inet6_bind_address",
+			"protect_path",
+			"routing_mark",
+			"reuse_addr",
+			"connect_timeout",
+			"tcp_fast_open",
+			"tcp_multi_path",
+			"udp_fragment",
+			"domain_strategy",
+			"fallback_delay",
+			"private_key",
+			"workers",
+			"mtu",
+		)
+		if value, exists := outbound["system_interface"]; exists {
+			endpoint["system"] = value
+		}
+		if value, exists := outbound["interface_name"]; exists {
+			endpoint["name"] = value
+		}
+		if value, exists := outbound["local_address"]; exists {
+			endpoint["address"] = value
+		}
+
+		peers, err := migrateLegacyWireGuardPeers(outbound)
+		if err != nil {
+			return err
+		}
+		endpoint["peers"] = peers
+		endpoints = append(endpoints, endpoint)
+	}
+
+	root["outbounds"] = modernOutbounds
+	if len(endpoints) > 0 {
+		root["endpoints"] = endpoints
+	}
+	return nil
+}
+
+func migrateLegacyWireGuardPeers(outbound map[string]any) ([]any, error) {
+	if rawPeers, ok := outbound["peers"].([]any); ok && len(rawPeers) > 0 {
+		peers := make([]any, 0, len(rawPeers))
+		for _, rawPeer := range rawPeers {
+			peer, ok := asStringMap(rawPeer)
+			if !ok {
+				return nil, fmt.Errorf("migrate WireGuard outbound: invalid peer")
+			}
+			modernPeer := map[string]any{}
+			copyFields(modernPeer, peer, "public_key", "pre_shared_key", "allowed_ips", "reserved")
+			if value, exists := peer["server"]; exists {
+				modernPeer["address"] = value
+			}
+			if value, exists := peer["server_port"]; exists {
+				modernPeer["port"] = value
+			}
+			peers = append(peers, modernPeer)
+		}
+		return peers, nil
+	}
+
+	server, _ := outbound["server"].(string)
+	if server == "" {
+		return nil, fmt.Errorf("migrate WireGuard outbound: missing server")
+	}
+	peer := map[string]any{
+		"address":     server,
+		"allowed_ips": []any{"0.0.0.0/0", "::/0"},
+	}
+	if value, exists := outbound["server_port"]; exists {
+		peer["port"] = value
+	}
+	copyFields(peer, outbound, "peer_public_key", "pre_shared_key", "reserved")
+	if value, exists := peer["peer_public_key"]; exists {
+		peer["public_key"] = value
+		delete(peer, "peer_public_key")
+	}
+	return []any{peer}, nil
+}
+
+func copyFields(destination map[string]any, source map[string]any, keys ...string) {
+	for _, key := range keys {
+		if value, exists := source[key]; exists && value != nil {
+			destination[key] = value
 		}
 	}
 }
