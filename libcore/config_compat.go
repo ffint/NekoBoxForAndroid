@@ -102,6 +102,8 @@ func migrateLegacyDNS(root map[string]any) error {
 		}
 	}
 
+	removeRedundantDNSDirectDetours(root, dnsObject)
+
 	if finalTag, _ := dnsObject["final"].(string); finalTag != "" {
 		if rcode := legacyRCodes[finalTag]; rcode != "" {
 			delete(dnsObject, "final")
@@ -120,6 +122,39 @@ func migrateLegacyDNS(root map[string]any) error {
 
 	root["dns"] = dnsObject
 	return nil
+}
+
+func removeRedundantDNSDirectDetours(root map[string]any, dnsObject map[string]any) {
+	emptyDirectTags := map[string]bool{}
+	rawOutbounds, _ := root["outbounds"].([]any)
+	for _, rawOutbound := range rawOutbounds {
+		outbound, ok := asStringMap(rawOutbound)
+		if !ok || outbound["type"] != "direct" {
+			continue
+		}
+		tag, _ := outbound["tag"].(string)
+		if tag == "" {
+			continue
+		}
+		if len(outbound) == 2 {
+			emptyDirectTags[tag] = true
+		}
+	}
+	if len(emptyDirectTags) == 0 {
+		return
+	}
+
+	rawServers, _ := dnsObject["servers"].([]any)
+	for _, rawServer := range rawServers {
+		server, ok := asStringMap(rawServer)
+		if !ok {
+			continue
+		}
+		detour, _ := server["detour"].(string)
+		if emptyDirectTags[detour] {
+			delete(server, "detour")
+		}
+	}
 }
 
 func convertLegacyDNSServer(server map[string]any, fakeIPOptions map[string]any) (map[string]any, string, error) {

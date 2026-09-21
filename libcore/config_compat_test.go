@@ -20,10 +20,14 @@ func decodeCompatConfig(t *testing.T, input string) map[string]any {
 
 func TestMigrateLegacyDNS(t *testing.T) {
 	root := decodeCompatConfig(t, `{
+	  "outbounds": [
+	    {"type":"direct","tag":"direct"},
+	    {"type":"direct","tag":"custom-direct","bind_interface":"wlan0"}
+	  ],
 	  "dns": {
 	    "servers": [
 	      {"tag":"dns-local","address":"local","detour":"direct"},
-	      {"tag":"dns-direct","address":"https://223.5.5.5/dns-query","address_resolver":"dns-local","strategy":"ipv4_only"},
+	      {"tag":"dns-direct","address":"https://223.5.5.5/dns-query","address_resolver":"dns-local","detour":"direct","strategy":"ipv4_only"},
 	      {"tag":"dns-remote","address":"https://dns.google/dns-query","address_resolver":"dns-direct","detour":"proxy","strategy":"prefer_ipv4"},
 	      {"tag":"dns-block","address":"rcode://success"},
 	      {"tag":"dns-fake","address":"fakeip","strategy":"ipv4_only"}
@@ -47,6 +51,14 @@ func TestMigrateLegacyDNS(t *testing.T) {
 	}
 
 	servers := dns["servers"].([]any)
+	for _, raw := range servers {
+		server := raw.(map[string]any)
+		if server["tag"] == "dns-direct" || server["tag"] == "dns-local" {
+			if _, exists := server["detour"]; exists {
+				t.Fatalf("redundant detour to empty direct outbound survived: %#v", server)
+			}
+		}
+	}
 	if len(servers) != 4 {
 		t.Fatalf("expected rcode server removal, got %d servers", len(servers))
 	}
@@ -68,6 +80,17 @@ func TestMigrateLegacyDNS(t *testing.T) {
 	directRule := rules[1].(map[string]any)
 	if directRule["strategy"] != "ipv4_only" {
 		t.Fatalf("DNS strategy not migrated: %#v", directRule)
+	}
+}
+
+func TestMigrateLegacyDNSPreservesNonEmptyDirectDetour(t *testing.T) {
+	root := decodeCompatConfig(t, `{
+	  "outbounds":[{"type":"direct","tag":"custom-direct","bind_interface":"wlan0"}],
+	  "dns":{"servers":[{"tag":"dns-custom","address":"https://1.1.1.1/dns-query","detour":"custom-direct"}]}
+	}`)
+	server := root["dns"].(map[string]any)["servers"].([]any)[0].(map[string]any)
+	if server["detour"] != "custom-direct" {
+		t.Fatalf("non-empty direct detour should be preserved: %#v", server)
 	}
 }
 

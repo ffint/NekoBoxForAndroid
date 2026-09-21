@@ -722,14 +722,12 @@ fun buildConfig(
         dns.servers.add(DNSServerOptions().apply {
             address = "local"
             tag = "dns-local"
-            detour = TAG_DIRECT
         })
 
         directDNS.firstOrNull().let {
             dns.servers.add(DNSServerOptions().apply {
                 address = it ?: throw Exception("No direct DNS, check your settings!")
                 tag = "dns-direct"
-                detour = TAG_DIRECT
                 address_resolver = "dns-local"
                 strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
             })
