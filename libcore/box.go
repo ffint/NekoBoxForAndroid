@@ -85,6 +85,11 @@ type BoxInstance struct {
 func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *BoxInstance, err error) {
 	defer device.DeferPanicToError("NewSingBoxInstance", func(err_ error) { err = err_ })
 
+	config, err = migrateLegacyConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("migrate config: %v", err)
+	}
+
 	// create box context
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = box.Context(ctx,
