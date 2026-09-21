@@ -434,6 +434,7 @@
     <string name="privacy_test_running">正在通过当前代理链路检测…</string>
     <string name="privacy_test_proxy_path_note">检测请求由当前 sing-box 实例发出。IPv4/IPv6 使用固定 Cloudflare 诊断 IP，DNS 使用 sing-box DNS Router。</string>
     <string name="privacy_test_requires_proxy">请先启动 VPN/代理再进行隐私检测。</string>
+    <string name="privacy_test_connecting_core">正在连接运行中的 VPN 核心…</string>
     <string name="privacy_test_failed">隐私检测失败：%1$s</string>
     <string name="privacy_proxy_status">保护状态</string>
     <string name="privacy_vpn_status">VPN / 代理状态</string>

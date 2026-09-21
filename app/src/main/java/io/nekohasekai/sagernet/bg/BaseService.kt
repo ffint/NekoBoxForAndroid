@@ -153,6 +153,16 @@ class BaseService {
             }
         }
 
+        override fun privacyProbe(timeoutMillis: Int): String {
+            val proxy = data?.proxy ?: error("core not started")
+            if (!proxy.isInitialized()) error("core not started")
+            return try {
+                Libcore.privacyProbeJSONForInstance(proxy.box, timeoutMillis)
+            } catch (e: Exception) {
+                error(Protocols.genFriendlyMsg(e.readableMessage))
+            }
+        }
+
         fun stateChanged(s: State, msg: String?) = launch {
             val profileName = profileName
             broadcast { it.stateChanged(s.ordinal, profileName, msg) }

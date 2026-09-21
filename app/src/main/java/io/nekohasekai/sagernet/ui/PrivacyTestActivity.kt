@@ -4,6 +4,9 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.core.view.isVisible
 import io.nekohasekai.sagernet.GroupType
+import io.nekohasekai.sagernet.aidl.ISagerNetService
+import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
@@ -14,7 +17,7 @@ import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import libcore.Libcore
 import moe.matsuri.nb4a.utils.JavaUtil
 
-class PrivacyTestActivity : ThemedActivity() {
+class PrivacyTestActivity : ThemedActivity(), SagerConnection.Callback {
 
     data class PrivacyProbeResult(
         var ipv4: String = "",
@@ -31,6 +34,8 @@ class PrivacyTestActivity : ThemedActivity() {
     )
 
     private lateinit var binding: LayoutPrivacyTestBinding
+    private val connection = SagerConnection(SagerConnection.CONNECTION_ID_PRIVACY_TEST)
+    private var pendingTest = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,13 +49,46 @@ class PrivacyTestActivity : ThemedActivity() {
             setHomeAsUpIndicator(R.drawable.baseline_arrow_back_24)
         }
 
-        binding.retest.setOnClickListener { runTest() }
+        binding.retest.setOnClickListener {
+            pendingTest = true
+            runTest()
+        }
         binding.stunTest.setOnClickListener {
             startActivity(Intent(this, StunActivity::class.java))
         }
 
         updateLocalStatus()
-        runTest()
+        pendingTest = true
+        connection.connect(this, this)
+    }
+
+    override fun onServiceConnected(service: ISagerNetService) {
+        DataStore.serviceState = runCatching {
+            BaseService.State.values()[service.state]
+        }.getOrDefault(BaseService.State.Idle)
+        updateLocalStatus()
+        if (pendingTest) runTest()
+    }
+
+    override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {
+        DataStore.serviceState = state
+        updateLocalStatus()
+        if (state.connected && pendingTest) runTest()
+    }
+
+    override fun onServiceDisconnected() {
+        DataStore.serviceState = BaseService.State.Idle
+        updateLocalStatus()
+    }
+
+    override fun onBinderDied() {
+        runCatching { connection.disconnect(this) }
+        connection.connect(this, this)
+    }
+
+    override fun onDestroy() {
+        connection.disconnect(this)
+        super.onDestroy()
     }
 
     private fun updateLocalStatus() {
@@ -89,10 +127,9 @@ class PrivacyTestActivity : ThemedActivity() {
 
     private fun runTest() {
         updateLocalStatus()
-        binding.waitLayout.isVisible = true
-        binding.retest.isEnabled = false
 
         if (!DataStore.serviceState.connected) {
+            pendingTest = false
             binding.waitLayout.isVisible = false
             binding.retest.isEnabled = true
             binding.testStatus.text = getString(R.string.privacy_test_requires_proxy)
@@ -100,12 +137,26 @@ class PrivacyTestActivity : ThemedActivity() {
             return
         }
 
+        val service = connection.service
+        if (service == null) {
+            pendingTest = true
+            binding.waitLayout.isVisible = true
+            binding.retest.isEnabled = false
+            binding.testStatus.text = getString(R.string.privacy_test_connecting_core)
+            return
+        }
+
+        pendingTest = false
+        binding.waitLayout.isVisible = true
+        binding.retest.isEnabled = false
+
         runOnDefaultDispatcher {
             val result = runCatching {
-                val json = Libcore.privacyProbeJSON(8000)
+                val json = service.privacyProbe(8000)
                 JavaUtil.gson.fromJson(json, PrivacyProbeResult::class.java)
             }
             onMainDispatcher {
+                if (isFinishing || isDestroyed) return@onMainDispatcher
                 binding.waitLayout.isVisible = false
                 binding.retest.isEnabled = true
                 result.onSuccess {

@@ -507,6 +507,7 @@
     <string name="privacy_test_running">Testing through the active proxy path…</string>
     <string name="privacy_test_proxy_path_note">These checks are sent through the active sing-box instance. IPv4/IPv6 use fixed Cloudflare diagnostic IPs; DNS uses the sing-box DNS router.</string>
     <string name="privacy_test_requires_proxy">Start the VPN/proxy before running the privacy test.</string>
+    <string name="privacy_test_connecting_core">Connecting to the active VPN core…</string>
     <string name="privacy_test_failed">Privacy test failed: %1$s</string>
     <string name="privacy_proxy_status">Protection status</string>
     <string name="privacy_vpn_status">VPN / proxy state</string>

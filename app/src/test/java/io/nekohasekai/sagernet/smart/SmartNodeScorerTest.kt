@@ -70,6 +70,28 @@ class SmartNodeScorerTest {
         assertTrue(decision.shouldSwitch)
     }
 
+
+    @Test
+    fun manualSmartTestBypassesHysteresisAndMinimumInterval() {
+        val config = SmartGroupConfig(
+            groupId = 1L,
+            switchScoreDelta = 99.0,
+            minSwitchIntervalMs = 10_000_000L,
+            lastSwitchAt = now - 1L,
+        )
+        val current = metric(1L, latency = 100.0, jitter = 10.0, mbps = 10.0)
+        val candidate = metric(2L, latency = 30.0, jitter = 2.0, mbps = 100.0)
+
+        val decision = SmartNodeScorer.decideSwitch(
+            current,
+            candidate,
+            config,
+            now,
+            forceBest = true,
+        )
+        assertTrue(decision.shouldSwitch)
+    }
+
     @Test
     fun lockedHealthyCurrentNodeDoesNotAutoSwitch() {
         val config = SmartGroupConfig(

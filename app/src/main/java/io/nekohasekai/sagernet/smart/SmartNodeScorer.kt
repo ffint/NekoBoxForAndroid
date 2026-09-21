@@ -121,6 +121,7 @@ object SmartNodeScorer {
         candidate: SmartNodeMetric?,
         config: SmartGroupConfig,
         now: Long = System.currentTimeMillis(),
+        forceBest: Boolean = false,
     ): SwitchDecision {
         if (candidate == null) {
             return SwitchDecision(false, current?.proxyId ?: 0L, 0L, "no candidate")
@@ -147,6 +148,14 @@ object SmartNodeScorer {
         }
         if (!config.autoSelect) {
             return SwitchDecision(false, current.proxyId, candidate.proxyId, "automatic selection disabled")
+        }
+        if (forceBest) {
+            return SwitchDecision(
+                true,
+                current.proxyId,
+                candidate.proxyId,
+                "manual Smart Test selected best candidate",
+            )
         }
         val elapsed = now - config.lastSwitchAt
         if (config.lastSwitchAt > 0L && elapsed < config.minSwitchIntervalMs) {

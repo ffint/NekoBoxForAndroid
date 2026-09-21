@@ -151,6 +151,24 @@ class ConfigurationFragment @JvmOverloads constructor(
                 DataStore.selectedGroup = adapter.groupList[position].id
             }
         }
+
+        override fun onPageSelected(position: Int) {
+            if (adapter.groupList.size > position) {
+                DataStore.selectedGroup = adapter.groupList[position].id
+                updateCurrentGroupAction()
+            }
+        }
+    }
+
+    private fun updateCurrentGroupAction() {
+        if (select) return
+        val group = runCatching { DataStore.currentGroup() }.getOrNull() ?: return
+        toolbar.menu.findItem(R.id.action_update_subscription)?.apply {
+            title = getString(
+                if (group.type == GroupType.SMART) R.string.smart_test
+                else R.string.update_current_subscription
+            )
+        }
     }
 
     override fun onQueryTextChange(query: String): Boolean {
@@ -179,6 +197,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.setOnMenuItemClickListener(this)
+            updateCurrentGroupAction()
         } else {
             toolbar.setTitle(titleRes)
             toolbar.setNavigationIcon(R.drawable.ic_navigation_close)
@@ -448,12 +467,41 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_update_subscription -> {
                 val group = DataStore.currentGroup()
-                if (group.type != GroupType.SUBSCRIPTION) {
-                    snackbar(R.string.group_not_subscription).show()
-                    Logs.e("onMenuItemClick: Group(${group.displayName()}) is not subscription")
-                } else {
-                    runOnLifecycleDispatcher {
+                when (group.type) {
+                    GroupType.SMART -> {
+                        item.isEnabled = false
+                        runOnLifecycleDispatcher {
+                            val error = try {
+                                SmartGroupManager.testGroup(
+                                    group.id,
+                                    includeThroughput = true,
+                                    fullThroughput = false,
+                                    forceSwitch = true,
+                                )
+                                null
+                            } catch (e: Exception) {
+                                Logs.e("Smart Group manual test failed", e)
+                                e
+                            }
+                            onMainDispatcher {
+                                if (!isAdded) return@onMainDispatcher
+                                item.isEnabled = true
+                                if (error != null) {
+                                    snackbar(error.readableMessage).show()
+                                } else {
+                                    getCurrentGroupFragment()?.adapter?.notifyDataSetChanged()
+                                }
+                            }
+                        }
+                    }
+
+                    GroupType.SUBSCRIPTION -> runOnLifecycleDispatcher {
                         GroupUpdater.startUpdate(group, true)
+                    }
+
+                    else -> {
+                        snackbar(R.string.group_not_subscription).show()
+                        Logs.e("onMenuItemClick: Group(${group.displayName()}) is not subscription")
                     }
                 }
             }

@@ -7,9 +7,14 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.SmartGroupConfig
 import io.nekohasekai.sagernet.database.SmartNodeMetric
 import io.nekohasekai.sagernet.ktx.Logs
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.abs
 
 object SmartGroupManager {
+
+    private val groupTestLocks = ConcurrentHashMap<Long, Mutex>()
 
     fun getOrCreateConfig(groupId: Long): SmartGroupConfig {
         return SagerDatabase.smartGroupDao.get(groupId)
@@ -87,14 +92,18 @@ object SmartGroupManager {
         groupId: Long,
         includeThroughput: Boolean = false,
         fullThroughput: Boolean = false,
+        forceSwitch: Boolean = false,
     ): List<SmartNodeMetric> {
-        val profiles = SagerDatabase.proxyDao.getByGroup(groupId)
-        val results = ArrayList<SmartNodeMetric>(profiles.size)
-        for (profile in profiles) {
-            results += testNode(profile, includeThroughput, fullThroughput)
+        val lock = groupTestLocks.computeIfAbsent(groupId) { Mutex() }
+        return lock.withLock {
+            val profiles = SagerDatabase.proxyDao.getByGroup(groupId)
+            val results = ArrayList<SmartNodeMetric>(profiles.size)
+            for (profile in profiles) {
+                results += testNode(profile, includeThroughput, fullThroughput)
+            }
+            evaluateAndSwitch(groupId, forceSwitch = forceSwitch)
+            results
         }
-        evaluateAndSwitch(groupId)
-        return results
     }
 
     suspend fun onNetworkChanged() {
@@ -122,6 +131,7 @@ object SmartGroupManager {
     fun evaluateAndSwitch(
         groupId: Long,
         now: Long = System.currentTimeMillis(),
+        forceSwitch: Boolean = false,
     ): SmartNodeScorer.SwitchDecision {
         val config = getOrCreateConfig(groupId)
         if (!config.enabled) {
@@ -148,7 +158,13 @@ object SmartGroupManager {
         }
         val current = metrics.firstOrNull { it.proxyId == currentId }
         val candidate = SmartNodeScorer.bestCandidate(metrics, config, now)
-        val decision = SmartNodeScorer.decideSwitch(current, candidate, config, now)
+        val decision = SmartNodeScorer.decideSwitch(
+            current,
+            candidate,
+            config,
+            now,
+            forceBest = forceSwitch,
+        )
 
         if (decision.shouldSwitch && decision.toProxyId > 0L) {
             config.currentProxyId = decision.toProxyId

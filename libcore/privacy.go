@@ -31,12 +31,22 @@ type privacyProbeResult struct {
 	DNSError           string `json:"dnsError,omitempty"`
 }
 
-// PrivacyProbeJSON tests the currently running sing-box instance. HTTP probes
-// use fixed Cloudflare IPv4/IPv6 addresses through the active proxy path, so
-// the result is not affected by the phone's local DNS. The DNS probe is sent
-// through sing-box's DNS router to Cloudflare's documented whoami endpoint.
+// PrivacyProbeJSON tests the main sing-box instance in the current process.
+// Android runs the active VPN core in the :bg process, so UI callers should
+// use the service AIDL method which delegates to PrivacyProbeJSONForInstance.
 func PrivacyProbeJSON(timeoutMillis int32) (string, error) {
-	if mainInstance == nil || mainInstance.Box == nil {
+	return privacyProbeJSON(mainInstance, timeoutMillis)
+}
+
+// PrivacyProbeJSONForInstance tests an explicit running sing-box instance.
+// HTTP probes use fixed Cloudflare IPv4/IPv6 addresses through the active
+// proxy path, and the DNS probe uses that instance's DNS router.
+func PrivacyProbeJSONForInstance(instance *BoxInstance, timeoutMillis int32) (string, error) {
+	return privacyProbeJSON(instance, timeoutMillis)
+}
+
+func privacyProbeJSON(instance *BoxInstance, timeoutMillis int32) (string, error) {
+	if instance == nil || instance.Box == nil {
 		return "", errors.New("core not started")
 	}
 	if timeoutMillis <= 0 {
@@ -46,24 +56,24 @@ func PrivacyProbeJSON(timeoutMillis int32) (string, error) {
 
 	result := privacyProbeResult{}
 
-	if ip, colo, err := privacyHTTPTrace("https://1.1.1.1/cdn-cgi/trace", timeout); err != nil {
+	if ip, colo, err := privacyHTTPTrace(instance, "https://1.1.1.1/cdn-cgi/trace", timeout); err != nil {
 		result.IPv4Error = err.Error()
 	} else {
 		result.IPv4 = ip
 		result.IPv4Colo = colo
 	}
 
-	if ip, colo, err := privacyHTTPTrace("https://[2606:4700:4700::1111]/cdn-cgi/trace", timeout); err != nil {
+	if ip, colo, err := privacyHTTPTrace(instance, "https://[2606:4700:4700::1111]/cdn-cgi/trace", timeout); err != nil {
 		result.IPv6Error = err.Error()
 	} else {
 		result.IPv6 = ip
 		result.IPv6Colo = colo
 	}
 
-	if mainInstance.dnsRouter == nil {
+	if instance.dnsRouter == nil {
 		result.DNSError = "DNS router unavailable"
 	} else {
-		ip, asn, country, raw, err := privacyDNSWhoami(timeout)
+		ip, asn, country, raw, err := privacyDNSWhoami(instance, timeout)
 		if err != nil {
 			result.DNSError = err.Error()
 		} else {
@@ -81,12 +91,12 @@ func PrivacyProbeJSON(timeoutMillis int32) (string, error) {
 	return string(payload), nil
 }
 
-func privacyHTTPTrace(link string, timeout time.Duration) (string, string, error) {
+func privacyHTTPTrace(instance *BoxInstance, link string, timeout time.Duration) (string, string, error) {
 	var tracker adapter.ConnectionTracker
-	if mainInstance.v2api != nil {
-		tracker = mainInstance.v2api.StatsService()
+	if instance.v2api != nil {
+		tracker = instance.v2api.StatsService()
 	}
-	client := boxapi.CreateProxyHttpClient(mainInstance.Box, tracker)
+	client := boxapi.CreateProxyHttpClient(instance.Box, tracker)
 	client.Timeout = timeout
 	defer client.CloseIdleConnections()
 
@@ -125,13 +135,13 @@ func privacyHTTPTrace(link string, timeout time.Duration) (string, string, error
 	return ip, strings.TrimSpace(values["colo"]), nil
 }
 
-func privacyDNSWhoami(timeout time.Duration) (string, string, string, string, error) {
+func privacyDNSWhoami(instance *BoxInstance, timeout time.Duration) (string, string, string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	message := new(dns.Msg)
 	message.SetQuestion(dns.Fqdn("whoami.cloudflare.net"), dns.TypeTXT)
-	response, err := mainInstance.dnsRouter.Exchange(
+	response, err := instance.dnsRouter.Exchange(
 		ctx,
 		message,
 		adapter.DNSQueryOptions{

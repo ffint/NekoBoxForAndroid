@@ -402,15 +402,27 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                     GroupType.SUBSCRIPTION -> GroupUpdater.startUpdate(proxyGroup, true)
                     GroupType.SMART -> {
                         updateButton.isEnabled = false
-                        runOnDefaultDispatcher {
-                            SmartGroupManager.testGroup(
-                                proxyGroup.id,
-                                includeThroughput = true,
-                                fullThroughput = false,
-                            )
+                        runOnLifecycleDispatcher {
+                            val error = try {
+                                SmartGroupManager.testGroup(
+                                    proxyGroup.id,
+                                    includeThroughput = true,
+                                    fullThroughput = false,
+                                    forceSwitch = true,
+                                )
+                                null
+                            } catch (e: Exception) {
+                                Logs.e("Smart Group manual test failed", e)
+                                e
+                            }
                             onMainDispatcher {
+                                if (!isAdded) return@onMainDispatcher
                                 updateButton.isEnabled = true
-                                bind(proxyGroup)
+                                if (error != null) {
+                                    snackbar(error.readableMessage).show()
+                                } else {
+                                    bind(proxyGroup)
+                                }
                             }
                         }
                     }
