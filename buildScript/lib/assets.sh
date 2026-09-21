@@ -8,9 +8,14 @@ mkdir -p $DIR
 cd $DIR
 
 get_latest_release() {
-  curl --silent "https://api.github.com/repos/$1/releases/latest" | # Get latest release from GitHub api
-    grep '"tag_name":' |                                            # Get tag line
-    sed -E 's/.*"([^"]+)".*/\1/'                                    # Pluck JSON value
+  local latest_url
+  latest_url=$(curl -fLsS -o /dev/null -w '%{url_effective}' "https://github.com/$1/releases/latest")
+  local version=${latest_url##*/}
+  if [ -z "$version" ] || [ "$version" = "latest" ]; then
+    echo "Failed to resolve latest release for $1" >&2
+    return 1
+  fi
+  printf '%s' "$version"
 }
 
 ####
