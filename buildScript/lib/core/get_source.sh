@@ -4,7 +4,7 @@ set -e
 source "buildScript/init/env.sh"
 ENV_NB4A=1
 source "buildScript/lib/core/get_source_env.sh"
-PATCH_SING_BOX="$(pwd)/buildScript/lib/core/patches/sing-box-1.14-neko-routed-flow.patch"
+PATCH_SING_BOX="$(pwd)/buildScript/lib/core/patches/sing-box-1.14.1-neko.patch"
 pushd ..
 
 ####
@@ -15,8 +15,8 @@ fi
 pushd sing-box
 git reset --hard "$COMMIT_SING_BOX"
 if [ -s "$PATCH_SING_BOX" ]; then
-  git apply --check "$PATCH_SING_BOX"
-  git apply "$PATCH_SING_BOX"
+  git apply --3way --check "$PATCH_SING_BOX"
+  git apply --3way "$PATCH_SING_BOX"
 fi
 popd
 
