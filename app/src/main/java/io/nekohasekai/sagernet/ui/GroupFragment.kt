@@ -362,6 +362,17 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                     startFilesForResult(exportProfiles, "profiles_${proxyGroup.displayName()}.txt")
                 }
 
+                R.id.action_smart_full_test -> {
+                    launchSmartGroupTest(proxyGroup.id, fullTest = true) { result ->
+                        result.onSuccess {
+                            bind(proxyGroup)
+                        }.onFailure {
+                            Logs.e("Smart Group full test failed", it)
+                            snackbar(it.readableMessage).show()
+                        }
+                    }
+                }
+
                 R.id.action_clear -> {
                     MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                         .setMessage(R.string.clear_profiles_message)
@@ -387,7 +398,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             editButton.isGone = proxyGroup.ungrouped
             updateButton.isInvisible = proxyGroup.type == GroupType.BASIC
             updateButton.setText(
-                if (proxyGroup.type == GroupType.SMART) R.string.smart_test else R.string.group_update
+                if (proxyGroup.type == GroupType.SMART) R.string.smart_quick_test else R.string.group_update
             )
             groupName.text = proxyGroup.displayName()
 
@@ -401,28 +412,12 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 when (proxyGroup.type) {
                     GroupType.SUBSCRIPTION -> GroupUpdater.startUpdate(proxyGroup, true)
                     GroupType.SMART -> {
-                        updateButton.isEnabled = false
-                        runOnLifecycleDispatcher {
-                            val error = try {
-                                SmartGroupManager.testGroup(
-                                    proxyGroup.id,
-                                    includeThroughput = true,
-                                    fullThroughput = false,
-                                    forceSwitch = true,
-                                )
-                                null
-                            } catch (e: Exception) {
-                                Logs.e("Smart Group manual test failed", e)
-                                e
-                            }
-                            onMainDispatcher {
-                                if (!isAdded) return@onMainDispatcher
-                                updateButton.isEnabled = true
-                                if (error != null) {
-                                    snackbar(error.readableMessage).show()
-                                } else {
-                                    bind(proxyGroup)
-                                }
+                        launchSmartGroupTest(proxyGroup.id, fullTest = false) { result ->
+                            result.onSuccess {
+                                bind(proxyGroup)
+                            }.onFailure {
+                                Logs.e("Smart Group quick test failed", it)
+                                snackbar(it.readableMessage).show()
                             }
                         }
                     }
@@ -437,6 +432,9 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 if (proxyGroup.type != GroupType.SUBSCRIPTION) {
                     popup.menu.removeItem(R.id.action_share_subscription)
+                }
+                if (proxyGroup.type != GroupType.SMART) {
+                    popup.menu.removeItem(R.id.action_smart_full_test)
                 }
                 popup.setOnMenuItemClickListener(this)
                 popup.show()

@@ -163,12 +163,14 @@ class ConfigurationFragment @JvmOverloads constructor(
     private fun updateCurrentGroupAction() {
         if (select) return
         val group = runCatching { DataStore.currentGroup() }.getOrNull() ?: return
+        val isSmart = group.type == GroupType.SMART
         toolbar.menu.findItem(R.id.action_update_subscription)?.apply {
             title = getString(
-                if (group.type == GroupType.SMART) R.string.smart_test
+                if (isSmart) R.string.smart_quick_test
                 else R.string.update_current_subscription
             )
         }
+        toolbar.menu.findItem(R.id.action_smart_full_test)?.isVisible = isSmart
     }
 
     override fun onQueryTextChange(query: String): Boolean {
@@ -469,28 +471,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val group = DataStore.currentGroup()
                 when (group.type) {
                     GroupType.SMART -> {
-                        item.isEnabled = false
-                        runOnLifecycleDispatcher {
-                            val error = try {
-                                SmartGroupManager.testGroup(
-                                    group.id,
-                                    includeThroughput = true,
-                                    fullThroughput = false,
-                                    forceSwitch = true,
-                                )
-                                null
-                            } catch (e: Exception) {
-                                Logs.e("Smart Group manual test failed", e)
-                                e
-                            }
-                            onMainDispatcher {
-                                if (!isAdded) return@onMainDispatcher
-                                item.isEnabled = true
-                                if (error != null) {
-                                    snackbar(error.readableMessage).show()
-                                } else {
-                                    getCurrentGroupFragment()?.adapter?.notifyDataSetChanged()
-                                }
+                        launchSmartGroupTest(group.id, fullTest = false) { result ->
+                            result.onSuccess {
+                                getCurrentGroupFragment()?.adapter?.notifyDataSetChanged()
+                            }.onFailure {
+                                Logs.e("Smart Group quick test failed", it)
+                                snackbar(it.readableMessage).show()
                             }
                         }
                     }
@@ -502,6 +488,20 @@ class ConfigurationFragment @JvmOverloads constructor(
                     else -> {
                         snackbar(R.string.group_not_subscription).show()
                         Logs.e("onMenuItemClick: Group(${group.displayName()}) is not subscription")
+                    }
+                }
+            }
+
+            R.id.action_smart_full_test -> {
+                val group = DataStore.currentGroup()
+                if (group.type == GroupType.SMART) {
+                    launchSmartGroupTest(group.id, fullTest = true) { result ->
+                        result.onSuccess {
+                            getCurrentGroupFragment()?.adapter?.notifyDataSetChanged()
+                        }.onFailure {
+                            Logs.e("Smart Group full test failed", it)
+                            snackbar(it.readableMessage).show()
+                        }
                     }
                 }
             }

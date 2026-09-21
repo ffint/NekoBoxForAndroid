@@ -8,11 +8,46 @@ import io.nekohasekai.sagernet.database.SmartGroupConfig
 import io.nekohasekai.sagernet.database.SmartNodeMetric
 import io.nekohasekai.sagernet.ktx.Logs
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlin.math.abs
 
 object SmartGroupManager {
+
+    enum class TestStage {
+        LATENCY,
+        THROUGHPUT,
+        SELECTING,
+        COMPLETE,
+    }
+
+    data class TestProgress(
+        val stage: TestStage,
+        val completed: Int,
+        val total: Int,
+        val profileName: String = "",
+    )
+
+    data class GroupTestResult(
+        val decision: SmartNodeScorer.SwitchDecision,
+        val elapsedMs: Long,
+        val testedNodeCount: Int,
+        val throughputNodeCount: Int,
+        val selectedProxyId: Long,
+        val selectedProfileName: String,
+    )
+
+    private const val QUICK_LATENCY_TIMEOUT_MS = 4_000
+    private const val QUICK_THROUGHPUT_TIMEOUT_MS = 6_000
+    private const val QUICK_THROUGHPUT_CANDIDATES = 3
+    private const val LATENCY_CONCURRENCY = 4
+    private const val THROUGHPUT_CONCURRENCY = 2
 
     private val groupTestLocks = ConcurrentHashMap<Long, Mutex>()
 
@@ -93,17 +128,173 @@ object SmartGroupManager {
         includeThroughput: Boolean = false,
         fullThroughput: Boolean = false,
         forceSwitch: Boolean = false,
-    ): List<SmartNodeMetric> {
+        onProgress: ((TestProgress) -> Unit)? = null,
+    ): GroupTestResult {
         val lock = groupTestLocks.computeIfAbsent(groupId) { Mutex() }
         return lock.withLock {
+            val startedAt = System.currentTimeMillis()
             val profiles = SagerDatabase.proxyDao.getByGroup(groupId)
-            val results = ArrayList<SmartNodeMetric>(profiles.size)
-            for (profile in profiles) {
-                results += testNode(profile, includeThroughput, fullThroughput)
+            val config = getOrCreateConfig(groupId)
+            if (profiles.isEmpty()) {
+                val decision = evaluateAndSwitch(groupId, forceSwitch = forceSwitch)
+                onProgress?.invoke(TestProgress(TestStage.COMPLETE, 0, 0))
+                return@withLock GroupTestResult(decision, 0L, 0, 0, 0L, "")
             }
-            evaluateAndSwitch(groupId, forceSwitch = forceSwitch)
-            results
+
+            val latencyTimeout = if (fullThroughput) {
+                config.timeoutMs
+            } else {
+                minOf(config.timeoutMs, QUICK_LATENCY_TIMEOUT_MS)
+            }
+            onProgress?.invoke(TestProgress(TestStage.LATENCY, 0, profiles.size))
+            runLatencyPhase(profiles, config, latencyTimeout, onProgress)
+
+            val throughputProfiles = when {
+                !includeThroughput -> emptyList()
+                fullThroughput -> profiles.filter { profile ->
+                    val metric = SagerDatabase.smartNodeDao.get(profile.id)
+                    metric != null && metric.lastSuccessAt >= startedAt && metric.currentLatencyMs > 0
+                }
+                else -> quickThroughputCandidates(profiles, config, startedAt)
+            }
+
+            if (throughputProfiles.isNotEmpty()) {
+                onProgress?.invoke(TestProgress(TestStage.THROUGHPUT, 0, throughputProfiles.size))
+                val throughputTimeout = if (fullThroughput) {
+                    config.timeoutMs
+                } else {
+                    minOf(config.timeoutMs, QUICK_THROUGHPUT_TIMEOUT_MS)
+                }
+                runThroughputPhase(
+                    throughputProfiles,
+                    config,
+                    throughputTimeout,
+                    fullThroughput,
+                    onProgress,
+                )
+            }
+
+            onProgress?.invoke(TestProgress(TestStage.SELECTING, 0, 1))
+            val decision = evaluateAndSwitch(groupId, forceSwitch = forceSwitch)
+            val elapsed = System.currentTimeMillis() - startedAt
+            val selectedProxyId = getOrCreateConfig(groupId).currentProxyId
+                .takeIf { it > 0L }
+                ?: decision.toProxyId.takeIf { it > 0L }
+                ?: decision.fromProxyId.takeIf { it > 0L }
+                ?: 0L
+            val selectedProfileName = profiles.firstOrNull { it.id == selectedProxyId }
+                ?.displayName()
+                .orEmpty()
+            onProgress?.invoke(TestProgress(TestStage.COMPLETE, 1, 1, selectedProfileName))
+            GroupTestResult(
+                decision = decision,
+                elapsedMs = elapsed,
+                testedNodeCount = profiles.size,
+                throughputNodeCount = throughputProfiles.size,
+                selectedProxyId = selectedProxyId,
+                selectedProfileName = selectedProfileName,
+            )
         }
+    }
+
+    private suspend fun runLatencyPhase(
+        profiles: List<ProxyEntity>,
+        config: SmartGroupConfig,
+        timeoutMs: Int,
+        onProgress: ((TestProgress) -> Unit)?,
+    ) = coroutineScope {
+        val completed = AtomicInteger(0)
+        val semaphore = Semaphore(LATENCY_CONCURRENCY)
+        profiles.map { profile ->
+            async {
+                semaphore.withPermit {
+                    val now = System.currentTimeMillis()
+                    try {
+                        val latency = SmartNodeProbe.latency(profile, config.latencyTestUrl, timeoutMs)
+                        recordLatency(profile, latency, now, config)
+                    } catch (e: Exception) {
+                        recordFailure(profile, e, System.currentTimeMillis(), config)
+                    } finally {
+                        onProgress?.invoke(
+                            TestProgress(
+                                stage = TestStage.LATENCY,
+                                completed = completed.incrementAndGet(),
+                                total = profiles.size,
+                                profileName = profile.displayName(),
+                            )
+                        )
+                    }
+                }
+            }
+        }.awaitAll()
+    }
+
+    private fun quickThroughputCandidates(
+        profiles: List<ProxyEntity>,
+        config: SmartGroupConfig,
+        startedAt: Long,
+    ): List<ProxyEntity> {
+        val profileById = profiles.associateBy { it.id }
+        val fresh = profiles.mapNotNull { profile ->
+            SagerDatabase.smartNodeDao.get(profile.id)?.takeIf {
+                it.lastSuccessAt >= startedAt && it.currentLatencyMs > 0
+            }
+        }
+        if (fresh.isEmpty()) return emptyList()
+
+        val now = System.currentTimeMillis()
+        val selectedIds = fresh
+            .sortedByDescending { SmartNodeScorer.components(it, config, now).total }
+            .take(QUICK_THROUGHPUT_CANDIDATES)
+            .mapTo(linkedSetOf()) { it.proxyId }
+
+        val currentId = config.currentProxyId.takeIf { it > 0L }
+            ?: DataStore.selectedProxy.takeIf { DataStore.selectedGroup == config.groupId && it > 0L }
+        if (currentId != null && fresh.any { it.proxyId == currentId }) {
+            selectedIds += currentId
+        }
+        if (config.lockedProxyId > 0L && fresh.any { it.proxyId == config.lockedProxyId }) {
+            selectedIds += config.lockedProxyId
+        }
+        return selectedIds.mapNotNull(profileById::get)
+    }
+
+    private suspend fun runThroughputPhase(
+        profiles: List<ProxyEntity>,
+        config: SmartGroupConfig,
+        timeoutMs: Int,
+        fullThroughput: Boolean,
+        onProgress: ((TestProgress) -> Unit)?,
+    ) = coroutineScope {
+        val completed = AtomicInteger(0)
+        val semaphore = Semaphore(THROUGHPUT_CONCURRENCY)
+        val bytes = if (fullThroughput) config.fullTestBytes else config.quickTestBytes
+        profiles.map { profile ->
+            async {
+                semaphore.withPermit {
+                    try {
+                        val measurement = SmartNodeProbe.throughput(
+                            profile,
+                            config.throughputTestUrl,
+                            timeoutMs,
+                            bytes,
+                        )
+                        recordThroughput(profile, measurement, System.currentTimeMillis(), config)
+                    } catch (e: Exception) {
+                        recordFailure(profile, e, System.currentTimeMillis(), config)
+                    } finally {
+                        onProgress?.invoke(
+                            TestProgress(
+                                stage = TestStage.THROUGHPUT,
+                                completed = completed.incrementAndGet(),
+                                total = profiles.size,
+                                profileName = profile.displayName(),
+                            )
+                        )
+                    }
+                }
+            }
+        }.awaitAll()
     }
 
     suspend fun onNetworkChanged() {
