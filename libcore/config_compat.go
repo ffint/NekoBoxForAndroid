@@ -26,6 +26,7 @@ func migrateLegacyConfig(config string) (string, error) {
 	if err := migrateLegacyWireGuard(root); err != nil {
 		return "", err
 	}
+	migrateLegacyTunFields(root)
 	migrateLegacyInboundFields(root)
 
 	data, err := json.Marshal(root)
@@ -373,6 +374,69 @@ func copyFields(destination map[string]any, source map[string]any, keys ...strin
 		if value, exists := source[key]; exists && value != nil {
 			destination[key] = value
 		}
+	}
+}
+
+func migrateLegacyTunFields(root map[string]any) {
+	rawInbounds, _ := root["inbounds"].([]any)
+	for _, rawInbound := range rawInbounds {
+		inbound, ok := asStringMap(rawInbound)
+		if !ok {
+			continue
+		}
+		inboundType, _ := inbound["type"].(string)
+		if inboundType != "tun" {
+			continue
+		}
+
+		mergeLegacyListableField(inbound, "address", "inet4_address", "inet6_address")
+		mergeLegacyListableField(inbound, "route_address", "inet4_route_address", "inet6_route_address")
+		mergeLegacyListableField(inbound, "route_exclude_address", "inet4_route_exclude_address", "inet6_route_exclude_address")
+
+		// endpoint_independent_nat has had no effect since sing-box 1.11.0.
+		delete(inbound, "endpoint_independent_nat")
+	}
+}
+
+func mergeLegacyListableField(object map[string]any, modernKey string, legacyKeys ...string) {
+	hasLegacy := false
+	for _, key := range legacyKeys {
+		if _, exists := object[key]; exists {
+			hasLegacy = true
+			break
+		}
+	}
+	if !hasLegacy {
+		return
+	}
+
+	values := make([]any, 0)
+	appendValue := func(value any) {
+		switch typed := value.(type) {
+		case []any:
+			values = append(values, typed...)
+		case nil:
+			return
+		default:
+			values = append(values, typed)
+		}
+	}
+	if value, exists := object[modernKey]; exists {
+		appendValue(value)
+	}
+	for _, key := range legacyKeys {
+		if value, exists := object[key]; exists {
+			appendValue(value)
+		}
+		delete(object, key)
+	}
+
+	if len(values) == 0 {
+		delete(object, modernKey)
+	} else if len(values) == 1 {
+		object[modernKey] = values[0]
+	} else {
+		object[modernKey] = values
 	}
 }
 

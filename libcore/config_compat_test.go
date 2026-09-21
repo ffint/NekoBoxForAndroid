@@ -71,6 +71,60 @@ func TestMigrateLegacyDNS(t *testing.T) {
 	}
 }
 
+func TestMigrateLegacyTunFields(t *testing.T) {
+	root := decodeCompatConfig(t, `{
+	  "inbounds":[{
+	    "type":"tun",
+	    "tag":"tun-in",
+	    "inet4_address":["172.19.0.1/28"],
+	    "inet6_address":"fdfe:dcba:9876::1/126",
+	    "inet4_route_address":["10.0.0.0/8"],
+	    "inet6_route_address":["fd00::/8"],
+	    "inet4_route_exclude_address":["192.168.0.0/16"],
+	    "endpoint_independent_nat":true
+	  }]
+	}`)
+
+	inbound := root["inbounds"].([]any)[0].(map[string]any)
+	for _, key := range []string{
+		"inet4_address", "inet6_address",
+		"inet4_route_address", "inet6_route_address",
+		"inet4_route_exclude_address", "inet6_route_exclude_address",
+		"endpoint_independent_nat",
+	} {
+		if _, exists := inbound[key]; exists {
+			t.Fatalf("legacy tun field %s survived", key)
+		}
+	}
+
+	address := inbound["address"].([]any)
+	if len(address) != 2 || address[0] != "172.19.0.1/28" || address[1] != "fdfe:dcba:9876::1/126" {
+		t.Fatalf("unexpected merged tun address: %#v", address)
+	}
+	routeAddress := inbound["route_address"].([]any)
+	if len(routeAddress) != 2 || routeAddress[0] != "10.0.0.0/8" || routeAddress[1] != "fd00::/8" {
+		t.Fatalf("unexpected merged route address: %#v", routeAddress)
+	}
+	if inbound["route_exclude_address"] != "192.168.0.0/16" {
+		t.Fatalf("unexpected route exclude address: %#v", inbound["route_exclude_address"])
+	}
+}
+
+func TestMigrateLegacyTunFieldsMergesModernAddress(t *testing.T) {
+	root := decodeCompatConfig(t, `{
+	  "inbounds":[{
+	    "type":"tun",
+	    "address":["172.19.0.1/28"],
+	    "inet6_address":["fdfe:dcba:9876::1/126"]
+	  }]
+	}`)
+	inbound := root["inbounds"].([]any)[0].(map[string]any)
+	address := inbound["address"].([]any)
+	if len(address) != 2 || address[0] != "172.19.0.1/28" || address[1] != "fdfe:dcba:9876::1/126" {
+		t.Fatalf("modern and legacy tun addresses were not merged: %#v", address)
+	}
+}
+
 func TestMigrateLegacyInboundFields(t *testing.T) {
 	root := decodeCompatConfig(t, `{
 	  "inbounds":[{"type":"tun","tag":"tun-in","sniff":true,"sniff_timeout":"1s","domain_strategy":"prefer_ipv4"}],
