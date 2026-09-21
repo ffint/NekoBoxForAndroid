@@ -81,6 +81,7 @@ type BoxInstance struct {
 
 	v2api        *boxapi.SbV2rayServer
 	selector     *group.Selector
+	dnsRouter    adapter.DNSRouter
 	pauseManager pause.Manager
 }
 
@@ -123,6 +124,7 @@ func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *Box
 	b = &BoxInstance{
 		Box:          instance,
 		cancel:       cancel,
+		dnsRouter:    service.FromContext[adapter.DNSRouter](ctx),
 		pauseManager: service.FromContext[pause.Manager](ctx),
 	}
 

@@ -18,10 +18,26 @@ object SmartGroupManager {
             }
     }
 
-    fun setLockedProxy(groupId: Long, proxyId: Long?) {
+    fun setLockedProxy(
+        groupId: Long,
+        proxyId: Long?,
+        now: Long = System.currentTimeMillis(),
+    ) {
         val config = getOrCreateConfig(groupId)
         config.lockedProxyId = proxyId ?: 0L
+        if (proxyId != null && proxyId > 0L) {
+            config.currentProxyId = proxyId
+            config.lastSwitchAt = now
+        }
         SagerDatabase.smartGroupDao.upsert(config)
+
+        if (proxyId != null && proxyId > 0L && DataStore.selectedGroup == groupId) {
+            DataStore.selectedProxy = proxyId
+            DataStore.currentProfile = proxyId
+            if (DataStore.serviceState.canStop) {
+                SagerNet.reloadService()
+            }
+        }
     }
 
     fun setAutoSelect(groupId: Long, enabled: Boolean) {

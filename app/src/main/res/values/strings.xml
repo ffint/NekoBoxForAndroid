@@ -42,6 +42,12 @@
     <string name="smart_test">Test</string>
     <string name="smart_node_status">Score %1$.0f · RTT %2$.0f ms · %3$.1f Mbps</string>
     <string name="smart_node_status_failures">Score %1$.0f · RTT %2$.0f ms · %3$.1f Mbps · Fail %4$d</string>
+    <string name="smart_marker_current">Current</string>
+    <string name="smart_marker_locked">Locked</string>
+    <string name="smart_test_quick">Quick proxy-path test</string>
+    <string name="smart_test_full">Full throughput test</string>
+    <string name="smart_lock_node">Lock this node</string>
+    <string name="smart_unlock_node">Unlock and resume automatic selection</string>
     <string name="group_status_proxies_subscription">%d Proxies | Updated on %s</string>
     <string name="group_no_difference">%s: No difference</string>
     <string name="group_updated">%s: Updated %d proxies</string>
@@ -496,6 +502,34 @@
         see if it solves your issues. Strongly recommend against using more than 4 connections here.</string>
 
     <string name="stun_test">NAT behaviour discovery</string>
+    <string name="privacy_test">Privacy Test</string>
+    <string name="privacy_test_summary">Check proxy-path IPv4/IPv6, DNS resolver egress and current protection status.</string>
+    <string name="privacy_test_running">Testing through the active proxy path…</string>
+    <string name="privacy_test_proxy_path_note">These checks are sent through the active sing-box instance. IPv4/IPv6 use fixed Cloudflare diagnostic IPs; DNS uses the sing-box DNS router.</string>
+    <string name="privacy_test_requires_proxy">Start the VPN/proxy before running the privacy test.</string>
+    <string name="privacy_test_failed">Privacy test failed: %1$s</string>
+    <string name="privacy_proxy_status">Protection status</string>
+    <string name="privacy_vpn_status">VPN / proxy state</string>
+    <string name="privacy_strict_mode">Strict Privacy</string>
+    <string name="privacy_current_node">Current node</string>
+    <string name="privacy_smart_group">Current group / score</string>
+    <string name="privacy_core_version">Core version</string>
+    <string name="privacy_network_results">Proxy-path network results</string>
+    <string name="privacy_ipv4">Public IPv4</string>
+    <string name="privacy_ipv6">Public IPv6</string>
+    <string name="privacy_dns_resolver">DNS resolver egress</string>
+    <string name="privacy_dns_raw">DNS diagnostic response</string>
+    <string name="privacy_webrtc_stun">WebRTC / STUN</string>
+    <string name="privacy_webrtc_note">Use the STUN test as an auxiliary UDP/NAT check. Browser WebRTC behavior is browser-specific; in Strict Privacy mode, VPN-captured UDP follows proxy-or-fail routing.</string>
+    <string name="privacy_retest">Retest</string>
+    <string name="privacy_status_connected">Connected</string>
+    <string name="privacy_status_not_connected">Not connected</string>
+    <string name="privacy_status_enabled">Enabled</string>
+    <string name="privacy_status_disabled">Disabled</string>
+    <string name="privacy_status_unavailable">Unavailable</string>
+    <string name="privacy_status_not_smart_group">Not a Smart Group</string>
+    <string name="privacy_score_value">Score %1$.0f</string>
+    <string name="privacy_blocked_or_unavailable">Blocked / unavailable: %1$s</string>
     <string name="stun_test_summary">Determine the client\'s NAT mapping behaviour and the NAT
         filtering behaviour defined in RFC 3478 using STUN.</string>
     <string name="start">Start</string>
@@ -547,6 +581,19 @@
     <string name="custom_config_json">Custom config JSON</string>
     <string name="is_outbound_only">The JSON set is outbound</string>
     <string name="save">Save</string>
+    <string name="app_groups">App groups</string>
+    <string name="app_group_google">Google</string>
+    <string name="app_group_meta">Meta</string>
+    <string name="app_group_telegram">Telegram</string>
+    <string name="app_group_browsers">Browsers</string>
+    <string name="app_group_overseas_social">Overseas social</string>
+    <string name="app_group_save_current">Save current selection as custom group</string>
+    <string name="app_group_manage">Manage custom groups</string>
+    <string name="app_group_name_hint">Group name</string>
+    <string name="app_group_empty_selection">Select at least one app first.</string>
+    <string name="app_group_applied">%1$s: added %2$d installed app(s) to the current selection.</string>
+    <string name="app_group_saved">Saved app group “%1$s”.</string>
+    <string name="app_group_deleted">Deleted app group “%1$s”.</string>
     <string name="set_panel_url">Set panel URL</string>
     <string name="enable_clash_api">Enable Clash API</string>
     <string name="log_level">Log Level</string>

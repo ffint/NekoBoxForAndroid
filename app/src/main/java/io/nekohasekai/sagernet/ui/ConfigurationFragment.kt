@@ -1599,12 +1599,23 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
 
                 if (proxyGroup.type == GroupType.SMART) {
+                    val smartConfig = SagerDatabase.smartGroupDao.get(proxyGroup.id)
                     SagerDatabase.smartNodeDao.get(proxyEntity.id)?.takeIf {
                         it.lastTestAt > 0L
                     }?.let { metric ->
-                        val smartCurrentId =
-                            SagerDatabase.smartGroupDao.get(proxyGroup.id)?.currentProxyId ?: 0L
-                        val marker = if (smartCurrentId == proxyEntity.id) "★ " else ""
+                        val markers = buildList {
+                            if (smartConfig?.currentProxyId == proxyEntity.id) {
+                                add(getString(R.string.smart_marker_current))
+                            }
+                            if (smartConfig?.lockedProxyId == proxyEntity.id) {
+                                add(getString(R.string.smart_marker_locked))
+                            }
+                        }
+                        val marker = if (markers.isEmpty()) {
+                            ""
+                        } else {
+                            markers.joinToString(" · ") + " · "
+                        }
                         profileStatus.text = marker + if (metric.consecutiveFailures > 0) {
                             getString(
                                 R.string.smart_node_status_failures,
@@ -1639,6 +1650,51 @@ class ConfigurationFragment @JvmOverloads constructor(
                             profileStatus.setOnClickListener(null)
                         }
                     }
+
+                    profileStatus.setOnLongClickListener {
+                        val locked = smartConfig?.lockedProxyId == proxyEntity.id
+                        val actions = arrayOf(
+                            getString(R.string.smart_test_quick),
+                            getString(R.string.smart_test_full),
+                            getString(
+                                if (locked) {
+                                    R.string.smart_unlock_node
+                                } else {
+                                    R.string.smart_lock_node
+                                }
+                            ),
+                        )
+                        MaterialAlertDialogBuilder(requireContext())
+                            .setTitle(proxyEntity.displayName())
+                            .setItems(actions) { _, which ->
+                                runOnDefaultDispatcher {
+                                    when (which) {
+                                        0 -> SmartGroupManager.testNode(
+                                            proxyEntity,
+                                            includeThroughput = true,
+                                            fullThroughput = false,
+                                        )
+
+                                        1 -> SmartGroupManager.testNode(
+                                            proxyEntity,
+                                            includeThroughput = true,
+                                            fullThroughput = true,
+                                        )
+
+                                        2 -> SmartGroupManager.setLockedProxy(
+                                            proxyGroup.id,
+                                            if (locked) null else proxyEntity.id,
+                                        )
+                                    }
+                                    SmartGroupManager.evaluateAndSwitch(proxyGroup.id)
+                                    ProfileManager.postUpdate(proxyEntity.id, true)
+                                }
+                            }
+                            .show()
+                        true
+                    }
+                } else {
+                    profileStatus.setOnLongClickListener(null)
                 }
 
                 editButton.setOnClickListener {
