@@ -22,6 +22,7 @@ import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.*
+import io.nekohasekai.sagernet.bg.SmartGroupUpdater
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
@@ -47,6 +48,26 @@ class GroupSettingsActivity(
         DataStore.groupOrder = order
         DataStore.groupIsSelector = isSelector
 
+        val smart = if (id > 0L) {
+            SagerDatabase.smartGroupDao.get(id) ?: SmartGroupConfig(groupId = id)
+        } else {
+            SmartGroupConfig(groupId = id)
+        }
+        DataStore.groupSmartAutoSelect = smart.autoSelect
+        DataStore.groupSmartLatencyUrl = smart.latencyTestUrl
+        DataStore.groupSmartThroughputUrl = smart.throughputTestUrl
+        DataStore.groupSmartHealthInterval = smart.healthIntervalMinutes
+        DataStore.groupSmartThroughputInterval = smart.throughputIntervalMinutes
+        DataStore.groupSmartSwitchDelta = smart.switchScoreDelta.toString()
+        DataStore.groupSmartMinSwitchInterval = (smart.minSwitchIntervalMs / 1000L).toInt()
+        DataStore.groupSmartFailureThreshold = smart.failureThreshold
+        DataStore.groupSmartLatencyWeight = smart.latencyWeight.toString()
+        DataStore.groupSmartJitterWeight = smart.jitterWeight.toString()
+        DataStore.groupSmartThroughputWeight = smart.throughputWeight.toString()
+        DataStore.groupSmartSuccessWeight = smart.successWeight.toString()
+        DataStore.groupSmartStabilityWeight = smart.stabilityWeight.toString()
+        DataStore.groupSmartFailureWeight = smart.failureWeight.toString()
+
         DataStore.frontProxy = frontProxy
         DataStore.landingProxy = landingProxy
         DataStore.frontProxyTmp = if (frontProxy >= 0) 3 else 0
@@ -66,7 +87,7 @@ class GroupSettingsActivity(
         name = DataStore.groupName.takeIf { it.isNotBlank() } ?: "My group"
         type = DataStore.groupType
         order = DataStore.groupOrder
-        isSelector = DataStore.groupIsSelector
+        isSelector = if (type == GroupType.SMART) true else DataStore.groupIsSelector
 
         frontProxy = if (DataStore.frontProxyTmp == 3) DataStore.frontProxy else -1
         landingProxy = if (DataStore.landingProxyTmp == 3) DataStore.landingProxy else -1
@@ -82,7 +103,41 @@ class GroupSettingsActivity(
                 autoUpdate = DataStore.subscriptionAutoUpdate
                 autoUpdateDelay = DataStore.subscriptionAutoUpdateDelay
             }
+        } else {
+            subscription = null
         }
+    }
+
+    private fun saveSmartConfig(group: ProxyGroup) {
+        if (group.type != GroupType.SMART) {
+            SagerDatabase.smartGroupDao.delete(group.id)
+            SagerDatabase.smartNodeDao.deleteByGroup(group.id)
+            return
+        }
+
+        val previous = SagerDatabase.smartGroupDao.get(group.id)
+            ?: SmartGroupConfig(groupId = group.id)
+        SagerDatabase.smartGroupDao.upsert(
+            previous.copy(
+                groupId = group.id,
+                enabled = true,
+                autoSelect = DataStore.groupSmartAutoSelect,
+                latencyTestUrl = DataStore.groupSmartLatencyUrl.trim(),
+                throughputTestUrl = DataStore.groupSmartThroughputUrl.trim(),
+                healthIntervalMinutes = DataStore.groupSmartHealthInterval,
+                throughputIntervalMinutes = DataStore.groupSmartThroughputInterval,
+                switchScoreDelta = DataStore.groupSmartSwitchDelta.toDoubleOrNull() ?: 8.0,
+                minSwitchIntervalMs =
+                    DataStore.groupSmartMinSwitchInterval.toLong().coerceAtLeast(0L) * 1000L,
+                failureThreshold = DataStore.groupSmartFailureThreshold,
+                latencyWeight = DataStore.groupSmartLatencyWeight.toDoubleOrNull() ?: 0.08,
+                jitterWeight = DataStore.groupSmartJitterWeight.toDoubleOrNull() ?: 0.08,
+                throughputWeight = DataStore.groupSmartThroughputWeight.toDoubleOrNull() ?: 0.28,
+                successWeight = DataStore.groupSmartSuccessWeight.toDoubleOrNull() ?: 0.20,
+                stabilityWeight = DataStore.groupSmartStabilityWeight.toDoubleOrNull() ?: 0.30,
+                failureWeight = DataStore.groupSmartFailureWeight.toDoubleOrNull() ?: 0.06,
+            )
+        )
     }
 
     fun needSave(): Boolean {
@@ -128,19 +183,58 @@ class GroupSettingsActivity(
         }
 
         val groupType = findPreference<SimpleMenuPreference>(Key.GROUP_TYPE)!!
+        val groupIsSelector = findPreference<SwitchPreference>(Key.GROUP_IS_SELECTOR)!!
+        val groupSmart = findPreference<PreferenceCategory>(Key.GROUP_SMART)!!
         val groupSubscription = findPreference<PreferenceCategory>(Key.GROUP_SUBSCRIPTION)!!
         val subscriptionUpdate = findPreference<PreferenceCategory>(Key.SUBSCRIPTION_UPDATE)!!
 
         fun updateGroupType(groupType: Int = DataStore.groupType) {
             val isSubscription = groupType == GroupType.SUBSCRIPTION
+            val isSmart = groupType == GroupType.SMART
+            groupSmart.isVisible = isSmart
             groupSubscription.isVisible = isSubscription
             subscriptionUpdate.isVisible = isSubscription
+            groupIsSelector.isEnabled = !isSmart
+            if (isSmart) groupIsSelector.isChecked = true
         }
         updateGroupType()
         groupType.setOnPreferenceChangeListener { _, newValue ->
             updateGroupType((newValue as String).toInt())
             true
         }
+
+        fun requireInt(key: String, min: Int, max: Int) {
+            findPreference<EditTextPreference>(key)!!.setOnPreferenceChangeListener { _, newValue ->
+                val value = (newValue as String).toIntOrNull()
+                value != null && value in min..max
+            }
+        }
+        fun requireDouble(key: String, min: Double, max: Double) {
+            findPreference<EditTextPreference>(key)!!.setOnPreferenceChangeListener { _, newValue ->
+                val value = (newValue as String).toDoubleOrNull()
+                value != null && value in min..max
+            }
+        }
+        fun requireHttpUrl(key: String) {
+            findPreference<EditTextPreference>(key)!!.setOnPreferenceChangeListener { _, newValue ->
+                val value = (newValue as String).trim()
+                value.startsWith("https://") || value.startsWith("http://")
+            }
+        }
+
+        requireHttpUrl(Key.GROUP_SMART_LATENCY_URL)
+        requireHttpUrl(Key.GROUP_SMART_THROUGHPUT_URL)
+        requireInt(Key.GROUP_SMART_HEALTH_INTERVAL, 15, 1440)
+        requireInt(Key.GROUP_SMART_THROUGHPUT_INTERVAL, 15, 10080)
+        requireDouble(Key.GROUP_SMART_SWITCH_DELTA, 0.0, 100.0)
+        requireInt(Key.GROUP_SMART_MIN_SWITCH_INTERVAL, 0, 86400)
+        requireInt(Key.GROUP_SMART_FAILURE_THRESHOLD, 1, 20)
+        requireDouble(Key.GROUP_SMART_LATENCY_WEIGHT, 0.0, 1.0)
+        requireDouble(Key.GROUP_SMART_JITTER_WEIGHT, 0.0, 1.0)
+        requireDouble(Key.GROUP_SMART_THROUGHPUT_WEIGHT, 0.0, 1.0)
+        requireDouble(Key.GROUP_SMART_SUCCESS_WEIGHT, 0.0, 1.0)
+        requireDouble(Key.GROUP_SMART_STABILITY_WEIGHT, 0.0, 1.0)
+        requireDouble(Key.GROUP_SMART_FAILURE_WEIGHT, 0.0, 1.0)
 
         val subscriptionAutoUpdate =
             findPreference<SwitchPreference>(Key.SUBSCRIPTION_AUTO_UPDATE)!!
@@ -241,7 +335,9 @@ class GroupSettingsActivity(
 
         val editingId = DataStore.editingId
         if (editingId == 0L) {
-            GroupManager.createGroup(ProxyGroup().apply { serialize() })
+            val group = GroupManager.createGroup(ProxyGroup().apply { serialize() })
+            saveSmartConfig(group)
+            SmartGroupUpdater.reconfigureUpdater()
         } else if (needSave()) {
             val entity = SagerDatabase.groupDao.getById(DataStore.editingId)
             if (entity == null) {
@@ -254,7 +350,10 @@ class GroupSettingsActivity(
             if (!keepUserInfo) {
                 entity.subscription?.subscriptionUserinfo = "";
             }
-            GroupManager.updateGroup(entity.apply { serialize() })
+            entity.serialize()
+            GroupManager.updateGroup(entity)
+            saveSmartConfig(entity)
+            SmartGroupUpdater.reconfigureUpdater()
         }
 
         finish()

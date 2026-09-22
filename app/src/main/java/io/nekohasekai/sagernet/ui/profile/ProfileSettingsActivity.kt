@@ -156,9 +156,9 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         menuInflater.inflate(R.menu.profile_config_menu, menu)
         menu.findItem(R.id.action_move)?.apply {
             if (DataStore.editingId != 0L // not new profile
-                && SagerDatabase.groupDao.getById(DataStore.editingGroup)?.type == GroupType.BASIC // not in subscription group
+                && SagerDatabase.groupDao.getById(DataStore.editingGroup)?.type != GroupType.SUBSCRIPTION
                 && SagerDatabase.groupDao.allGroups()
-                    .filter { it.type == GroupType.BASIC }.size > 1 // have other basic group
+                    .count { it.type == GroupType.BASIC || it.type == GroupType.SMART } > 1
             ) isVisible = true
         }
         menu.findItem(R.id.action_create_shortcut)?.apply {
@@ -337,7 +337,10 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                     orientation = LinearLayout.VERTICAL
 
                     SagerDatabase.groupDao.allGroups()
-                        .filter { it.type == GroupType.BASIC && it.id != ent.groupId }
+                        .filter {
+                            (it.type == GroupType.BASIC || it.type == GroupType.SMART) &&
+                                it.id != ent.groupId
+                        }
                         .forEach { group ->
                             LayoutGroupItemBinding.inflate(layoutInflater, this, true).apply {
                                 edit.isVisible = false
@@ -349,6 +352,11 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                                         val oldGroupId = ent.groupId
                                         val newGroupId = group.id
                                         ent.groupId = newGroupId
+                                        SagerDatabase.smartNodeDao.delete(ent.id)
+                                        SagerDatabase.smartGroupDao.clearProxyReference(
+                                            oldGroupId,
+                                            ent.id,
+                                        )
                                         ProfileManager.updateProfile(ent)
                                         GroupManager.postUpdate(oldGroupId) // reload
                                         GroupManager.postUpdate(newGroupId)

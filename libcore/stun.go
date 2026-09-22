@@ -13,20 +13,21 @@ type StunResult struct {
 }
 
 func StunTest(server string) *StunResult {
-	//note: this library doesn't support stun1.l.google.com:19302
+	// note: this library doesn't support stun1.l.google.com:19302
 	ret := &StunResult{}
 	var text string
 
-	// Old NAT Type Test
+	// Classic NAT discovery can still return a useful external endpoint even
+	// when the RFC 5780 behavior test is unsupported by the selected server.
 	client := stun.NewClient()
 	client.SetServerAddr(server)
-	nat, host, err, fakeFullCone := client.Discover()
-	if err != nil {
-		text += fmt.Sprintln("Discover Error:", err.Error())
+	nat, host, discoverErr, fakeFullCone := client.Discover()
+	if discoverErr != nil {
+		text += fmt.Sprintln("Classic discovery error:", discoverErr.Error())
 	}
 
 	if fakeFullCone {
-		text += fmt.Sprintln("Fake fullcone (no endpoint IP change) detected!!")
+		text += fmt.Sprintln("Classic discovery note: the STUN server did not change endpoint; full-cone detection is not reliable for this server.")
 	}
 
 	if host != nil {
@@ -36,11 +37,16 @@ func StunTest(server string) *StunResult {
 		text += fmt.Sprintln("External Port:", host.Port())
 	}
 
-	// New NAT Test
-
-	natBehavior, err := client.BehaviorTest()
-	if err != nil {
-		text += fmt.Sprintln("BehaviorTest Error:", err.Error())
+	// RFC 5780 mapping/filtering behavior test. Some public STUN servers do not
+	// expose the alternate response IP/port required by this test. Treat that
+	// as a partial result instead of making the whole NAT check look broken.
+	natBehavior, behaviorErr := client.BehaviorTest()
+	if behaviorErr != nil {
+		if strings.Contains(strings.ToLower(behaviorErr.Error()), "response ip/port") {
+			text += fmt.Sprintln("Behavior test: unavailable (this STUN server does not provide the alternate response IP/port required for RFC 5780).")
+		} else {
+			text += fmt.Sprintln("Behavior test error:", behaviorErr.Error())
+		}
 	}
 
 	if natBehavior != nil {
@@ -49,7 +55,10 @@ func StunTest(server string) *StunResult {
 		text += fmt.Sprintln("Normal NAT Type:", natBehavior.NormalType())
 	}
 
-	ret.Success = true
+	ret.Success = host != nil || natBehavior != nil
+	if !ret.Success && strings.TrimSpace(text) == "" {
+		text = "No usable STUN result"
+	}
 	ret.Text = strings.TrimRight(text, "\n")
 	return ret
 }

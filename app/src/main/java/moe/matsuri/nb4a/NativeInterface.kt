@@ -6,6 +6,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Build.VERSION_CODES
 import androidx.annotation.RequiresApi
+import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.bg.ServiceNotification
 import io.nekohasekai.sagernet.database.DataStore
@@ -13,6 +14,7 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.smart.SmartGroupManager
 import io.nekohasekai.sagernet.utils.PackageCache
 import libcore.BoxPlatformInterface
 import libcore.Libcore
@@ -92,6 +94,9 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                 val id = data.proxy!!.config.profileTagMap
                     .filterValues { it == tag }.keys.firstOrNull() ?: -1
                 val ent = SagerDatabase.proxyDao.getById(id) ?: return@runOnDefaultDispatcher
+                if (SagerDatabase.groupDao.getById(ent.groupId)?.type == GroupType.SMART) {
+                    SmartGroupManager.markManualSelection(ent.groupId, ent.id)
+                }
                 // traffic & title
                 data.proxy?.apply {
                     looper?.selectMain(id)

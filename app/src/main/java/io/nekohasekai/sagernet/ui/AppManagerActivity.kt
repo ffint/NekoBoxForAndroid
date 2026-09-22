@@ -15,6 +15,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Filter
 import android.widget.Filterable
+import android.widget.EditText
 import androidx.annotation.UiThread
 import androidx.core.util.contains
 import androidx.core.util.set
@@ -45,9 +46,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import moe.matsuri.nb4a.utils.NGUtil
+import org.json.JSONObject
 import kotlin.coroutines.coroutineContext
 
 class AppManagerActivity : ThemedActivity() {
+    private data class AppGroup(
+        val name: String,
+        val packages: Set<String>,
+    )
+
     companion object {
         @SuppressLint("StaticFieldLeak")
         private var instance: AppManagerActivity? = null
@@ -263,6 +270,11 @@ class AppManagerActivity : ThemedActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.action_app_groups -> {
+                showAppGroupsDialog()
+                return true
+            }
+
             R.id.action_invert_selections -> {
                 runOnDefaultDispatcher {
                     val proxiedUidsOld = proxiedUids.clone()
@@ -332,6 +344,207 @@ class AppManagerActivity : ThemedActivity() {
             }
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    private fun builtInAppGroups(): List<AppGroup> = listOf(
+        AppGroup(
+            getString(R.string.app_group_google),
+            setOf(
+                "com.google.android.googlequicksearchbox",
+                "com.android.chrome",
+                "com.google.android.gms",
+                "com.android.vending",
+                "com.google.android.youtube",
+                "com.google.android.gm",
+                "com.google.android.apps.maps",
+                "com.google.android.apps.photos",
+                "com.google.android.apps.docs",
+                "com.google.android.apps.bard",
+                "com.google.android.apps.tachyon",
+            ),
+        ),
+        AppGroup(
+            getString(R.string.app_group_meta),
+            setOf(
+                "com.facebook.katana",
+                "com.facebook.orca",
+                "com.facebook.lite",
+                "com.instagram.android",
+                "com.whatsapp",
+                "com.whatsapp.w4b",
+            ),
+        ),
+        AppGroup(
+            getString(R.string.app_group_telegram),
+            setOf(
+                "org.telegram.messenger",
+                "org.telegram.messenger.web",
+                "org.thunderdog.challegram",
+                "tw.nekomimi.nekogram",
+            ),
+        ),
+        AppGroup(
+            getString(R.string.app_group_browsers),
+            setOf(
+                "com.android.chrome",
+                "org.mozilla.firefox",
+                "com.microsoft.emmx",
+                "com.brave.browser",
+                "com.opera.browser",
+                "com.vivaldi.browser",
+                "com.kiwibrowser.browser",
+            ),
+        ),
+        AppGroup(
+            getString(R.string.app_group_overseas_social),
+            setOf(
+                "com.twitter.android",
+                "com.discord",
+                "com.reddit.frontpage",
+                "com.zhiliaoapp.musically",
+                "com.snapchat.android",
+                "com.pinterest",
+                "com.linkedin.android",
+                "org.thoughtcrime.securesms",
+            ),
+        ),
+    )
+
+    private fun showAppGroupsDialog() {
+        val groups = builtInAppGroups() + loadCustomAppGroups().map { (name, packages) ->
+            AppGroup(name, packages)
+        }
+        val items = groups.map { it.name }.toMutableList().apply {
+            add(getString(R.string.app_group_save_current))
+        }
+        val customGroups = loadCustomAppGroups()
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.app_groups)
+            .setItems(items.toTypedArray()) { _, which ->
+                if (which < groups.size) {
+                    applyAppGroup(groups[which])
+                } else {
+                    promptSaveCurrentAppGroup()
+                }
+            }
+            .apply {
+                if (customGroups.isNotEmpty()) {
+                    setNeutralButton(R.string.app_group_manage) { _, _ ->
+                        showDeleteCustomAppGroup()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun applyAppGroup(group: AppGroup) {
+        val before = proxiedUids.size()
+        for (packageName in group.packages) {
+            cachedApps[packageName]?.applicationInfo?.uid?.let { uid ->
+                proxiedUids[uid] = true
+            }
+        }
+        persistAppSelection()
+        apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+        appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
+        val added = (proxiedUids.size() - before).coerceAtLeast(0)
+        Snackbar.make(
+            binding.list,
+            getString(R.string.app_group_applied, group.name, added),
+            Snackbar.LENGTH_LONG,
+        ).show()
+    }
+
+    private fun persistAppSelection() {
+        DataStore.individual = cachedApps.mapNotNull { (packageName, packageInfo) ->
+            val uid = packageInfo.applicationInfo?.uid ?: return@mapNotNull null
+            packageName.takeIf { proxiedUids[uid] }
+        }.sorted().joinToString("\n")
+    }
+
+    private fun promptSaveCurrentAppGroup() {
+        val selected = DataStore.individual.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+        if (selected.isEmpty()) {
+            Snackbar.make(binding.list, R.string.app_group_empty_selection, Snackbar.LENGTH_LONG)
+                .show()
+            return
+        }
+
+        val input = EditText(this).apply {
+            hint = getString(R.string.app_group_name_hint)
+            setSingleLine(true)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.app_group_save_current)
+            .setView(input)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text?.toString()?.trim().orEmpty()
+                if (name.isNotEmpty()) {
+                    val groups = loadCustomAppGroups()
+                    groups[name] = selected
+                    saveCustomAppGroups(groups)
+                    Snackbar.make(
+                        binding.list,
+                        getString(R.string.app_group_saved, name),
+                        Snackbar.LENGTH_LONG,
+                    ).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showDeleteCustomAppGroup() {
+        val groups = loadCustomAppGroups()
+        if (groups.isEmpty()) return
+        val names = groups.keys.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.app_group_manage)
+            .setItems(names) { _, which ->
+                val name = names[which]
+                groups.remove(name)
+                saveCustomAppGroups(groups)
+                Snackbar.make(
+                    binding.list,
+                    getString(R.string.app_group_deleted, name),
+                    Snackbar.LENGTH_LONG,
+                ).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun loadCustomAppGroups(): LinkedHashMap<String, Set<String>> {
+        val groups = linkedMapOf<String, Set<String>>()
+        runCatching {
+            val root = JSONObject(DataStore.appGroups)
+            val names = root.keys()
+            while (names.hasNext()) {
+                val name = names.next()
+                val array = root.optJSONArray(name) ?: continue
+                val packages = linkedSetOf<String>()
+                for (index in 0 until array.length()) {
+                    array.optString(index).takeIf { it.isNotBlank() }?.let(packages::add)
+                }
+                if (packages.isNotEmpty()) groups[name] = packages
+            }
+        }.onFailure { Logs.w(it) }
+        return groups
+    }
+
+    private fun saveCustomAppGroups(groups: Map<String, Set<String>>) {
+        val root = JSONObject()
+        for ((name, packages) in groups) {
+            val array = org.json.JSONArray()
+            packages.sorted().forEach(array::put)
+            root.put(name, array)
+        }
+        DataStore.appGroups = root.toString()
     }
 
     private fun selectProxyApp() {

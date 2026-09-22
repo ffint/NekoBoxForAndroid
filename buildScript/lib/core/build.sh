@@ -5,4 +5,4 @@ export CGO_ENABLED=1
 export GO386=softfloat
 
 cd libcore
-rel=1 ./build.sh || exit 1
+rel=1 bash ./build.sh || exit 1

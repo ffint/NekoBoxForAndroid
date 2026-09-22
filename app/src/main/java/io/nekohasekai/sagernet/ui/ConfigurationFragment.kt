@@ -77,6 +77,7 @@ import io.nekohasekai.sagernet.ktx.snackbar
 import io.nekohasekai.sagernet.ktx.startFilesForResult
 import io.nekohasekai.sagernet.ktx.tryToShow
 import io.nekohasekai.sagernet.plugin.PluginManager
+import io.nekohasekai.sagernet.smart.SmartGroupManager
 import io.nekohasekai.sagernet.ui.profile.ChainSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HttpSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HysteriaSettingsActivity
@@ -150,6 +151,26 @@ class ConfigurationFragment @JvmOverloads constructor(
                 DataStore.selectedGroup = adapter.groupList[position].id
             }
         }
+
+        override fun onPageSelected(position: Int) {
+            if (adapter.groupList.size > position) {
+                DataStore.selectedGroup = adapter.groupList[position].id
+                updateCurrentGroupAction()
+            }
+        }
+    }
+
+    private fun updateCurrentGroupAction() {
+        if (select) return
+        val group = runCatching { DataStore.currentGroup() }.getOrNull() ?: return
+        val isSmart = group.type == GroupType.SMART
+        toolbar.menu.findItem(R.id.action_update_subscription)?.apply {
+            title = getString(
+                if (isSmart) R.string.smart_quick_test
+                else R.string.update_current_subscription
+            )
+        }
+        toolbar.menu.findItem(R.id.action_smart_full_test)?.isVisible = isSmart
     }
 
     override fun onQueryTextChange(query: String): Boolean {
@@ -178,6 +199,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.setOnMenuItemClickListener(this)
+            updateCurrentGroupAction()
         } else {
             toolbar.setTitle(titleRes)
             toolbar.setNavigationIcon(R.drawable.ic_navigation_close)
@@ -447,12 +469,39 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_update_subscription -> {
                 val group = DataStore.currentGroup()
-                if (group.type != GroupType.SUBSCRIPTION) {
-                    snackbar(R.string.group_not_subscription).show()
-                    Logs.e("onMenuItemClick: Group(${group.displayName()}) is not subscription")
-                } else {
-                    runOnLifecycleDispatcher {
+                when (group.type) {
+                    GroupType.SMART -> {
+                        launchSmartGroupTest(group.id, fullTest = false) { result ->
+                            result.onSuccess {
+                                getCurrentGroupFragment()?.adapter?.notifyDataSetChanged()
+                            }.onFailure {
+                                Logs.e("Smart Group quick test failed", it)
+                                snackbar(it.readableMessage).show()
+                            }
+                        }
+                    }
+
+                    GroupType.SUBSCRIPTION -> runOnLifecycleDispatcher {
                         GroupUpdater.startUpdate(group, true)
+                    }
+
+                    else -> {
+                        snackbar(R.string.group_not_subscription).show()
+                        Logs.e("onMenuItemClick: Group(${group.displayName()}) is not subscription")
+                    }
+                }
+            }
+
+            R.id.action_smart_full_test -> {
+                val group = DataStore.currentGroup()
+                if (group.type == GroupType.SMART) {
+                    launchSmartGroupTest(group.id, fullTest = true) { result ->
+                        result.onSuccess {
+                            getCurrentGroupFragment()?.adapter?.notifyDataSetChanged()
+                        }.onFailure {
+                            Logs.e("Smart Group full test failed", it)
+                            snackbar(it.readableMessage).show()
+                        }
                     }
                 }
             }
@@ -1504,6 +1553,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 update = DataStore.selectedProxy != proxyEntity.id
                                 lastSelected = DataStore.selectedProxy
                                 DataStore.selectedProxy = proxyEntity.id
+                                if (proxyGroup.type == GroupType.SMART) {
+                                    SmartGroupManager.markManualSelection(
+                                        proxyGroup.id,
+                                        proxyEntity.id,
+                                    )
+                                }
                                 onMainDispatcher {
                                     selectedView.visibility = View.VISIBLE
                                 }
@@ -1589,6 +1644,105 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 } else {
                     profileStatus.setOnClickListener(null)
+                }
+
+                if (proxyGroup.type == GroupType.SMART) {
+                    val smartConfig = SagerDatabase.smartGroupDao.get(proxyGroup.id)
+                    SagerDatabase.smartNodeDao.get(proxyEntity.id)?.takeIf {
+                        it.lastTestAt > 0L
+                    }?.let { metric ->
+                        val markers = buildList {
+                            if (smartConfig?.currentProxyId == proxyEntity.id) {
+                                add(getString(R.string.smart_marker_current))
+                            }
+                            if (smartConfig?.lockedProxyId == proxyEntity.id) {
+                                add(getString(R.string.smart_marker_locked))
+                            }
+                        }
+                        val marker = if (markers.isEmpty()) {
+                            ""
+                        } else {
+                            markers.joinToString(" · ") + " · "
+                        }
+                        profileStatus.text = marker + if (metric.consecutiveFailures > 0) {
+                            getString(
+                                R.string.smart_node_status_failures,
+                                metric.score,
+                                metric.averageLatencyMs.coerceAtLeast(0.0),
+                                metric.downloadMbps.coerceAtLeast(0.0),
+                                metric.consecutiveFailures,
+                            )
+                        } else {
+                            getString(
+                                R.string.smart_node_status,
+                                metric.score,
+                                metric.averageLatencyMs.coerceAtLeast(0.0),
+                                metric.downloadMbps.coerceAtLeast(0.0),
+                            )
+                        }
+                        profileStatus.setTextColor(
+                            requireContext().getColour(
+                                if (metric.consecutiveFailures > 0) {
+                                    R.color.material_red_500
+                                } else {
+                                    R.color.material_green_500
+                                }
+                            )
+                        )
+                        val error = metric.lastError
+                        if (!error.isNullOrBlank()) {
+                            profileStatus.setOnClickListener {
+                                alert(error).tryToShow()
+                            }
+                        } else {
+                            profileStatus.setOnClickListener(null)
+                        }
+                    }
+
+                    profileStatus.setOnLongClickListener {
+                        val locked = smartConfig?.lockedProxyId == proxyEntity.id
+                        val actions = arrayOf(
+                            getString(R.string.smart_test_quick),
+                            getString(R.string.smart_test_full),
+                            getString(
+                                if (locked) {
+                                    R.string.smart_unlock_node
+                                } else {
+                                    R.string.smart_lock_node
+                                }
+                            ),
+                        )
+                        MaterialAlertDialogBuilder(requireContext())
+                            .setTitle(proxyEntity.displayName())
+                            .setItems(actions) { _, which ->
+                                runOnDefaultDispatcher {
+                                    when (which) {
+                                        0 -> SmartGroupManager.testNode(
+                                            proxyEntity,
+                                            includeThroughput = true,
+                                            fullThroughput = false,
+                                        )
+
+                                        1 -> SmartGroupManager.testNode(
+                                            proxyEntity,
+                                            includeThroughput = true,
+                                            fullThroughput = true,
+                                        )
+
+                                        2 -> SmartGroupManager.setLockedProxy(
+                                            proxyGroup.id,
+                                            if (locked) null else proxyEntity.id,
+                                        )
+                                    }
+                                    SmartGroupManager.evaluateAndSwitch(proxyGroup.id)
+                                    ProfileManager.postUpdate(proxyEntity.id, true)
+                                }
+                            }
+                            .show()
+                        true
+                    }
+                } else {
+                    profileStatus.setOnLongClickListener(null)
                 }
 
                 editButton.setOnClickListener {

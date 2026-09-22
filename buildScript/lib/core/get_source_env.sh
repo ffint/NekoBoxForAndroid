@@ -1,2 +1,2 @@
-export COMMIT_SING_BOX="aed32ee3066cdbc7d471e3e0415c5134088962df"
+export COMMIT_SING_BOX="0bd0381c146042237abacc831249a90ab753ef8e" # 1.14.0-neko-1; legacy config is migrated in libcore before parsing
 export COMMIT_LIBNEKO="1c47a3af71990a7b2192e03292b4d246c308ef0b"

@@ -1,7 +1,12 @@
 name: Preview Build
 on:
+  push:
+    branches:
+      - enhanced-v0.1.0
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
 jobs:
   libcore:
     name: Native Build (LibCore)

@@ -79,9 +79,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     fun selectedGroupForImport(): Long {
         val current = currentGroup()
-        if (current.type == GroupType.BASIC) return current.id
+        if (current.type == GroupType.BASIC || current.type == GroupType.SMART) return current.id
         val groups = SagerDatabase.groupDao.allGroups()
-        return groups.find { it.type == GroupType.BASIC }!!.id
+        return groups.find { it.type == GroupType.BASIC || it.type == GroupType.SMART }!!.id
     }
 
     var appTLSVersion by configurationStore.string(Key.APP_TLS_VERSION)
@@ -117,6 +117,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var directDns by configurationStore.string(Key.DIRECT_DNS) { "https://223.5.5.5/dns-query" }
     var enableDnsRouting by configurationStore.boolean(Key.ENABLE_DNS_ROUTING) { true }
     var enableFakeDns by configurationStore.boolean(Key.ENABLE_FAKEDNS) { true }
+    var strictPrivacyMode by configurationStore.boolean(Key.STRICT_PRIVACY_MODE) { false }
+    var enableBlockRuleSets by configurationStore.boolean(Key.ENABLE_BLOCK_RULESETS) { false }
+    var blockRuleSets by configurationStore.string(Key.BLOCK_RULESETS) {
+        "geosite:category-ads-all"
+    }
 
     var rulesProvider by configurationStore.stringToInt(Key.RULES_PROVIDER)
     var logLevel by configurationStore.stringToInt(Key.LOG_LEVEL)
@@ -150,6 +155,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var proxyApps by configurationStore.boolean(Key.PROXY_APPS)
     var bypass by configurationStore.boolean(Key.BYPASS_MODE) { true }
     var individual by configurationStore.string(Key.INDIVIDUAL)
+    var appGroups by configurationStore.string(Key.APP_GROUPS) { "{}" }
     var showDirectSpeed by configurationStore.boolean(Key.SHOW_DIRECT_SPEED) { true }
 
     val persistAcrossReboot by configurationStore.boolean(Key.PERSIST_ACROSS_REBOOT) { false }
@@ -242,6 +248,21 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var groupType by profileCacheStore.stringToInt(Key.GROUP_TYPE)
     var groupOrder by profileCacheStore.stringToInt(Key.GROUP_ORDER)
     var groupIsSelector by profileCacheStore.boolean(Key.GROUP_IS_SELECTOR)
+
+    var groupSmartAutoSelect by profileCacheStore.boolean(Key.GROUP_SMART_AUTO_SELECT) { true }
+    var groupSmartLatencyUrl by profileCacheStore.string(Key.GROUP_SMART_LATENCY_URL)
+    var groupSmartThroughputUrl by profileCacheStore.string(Key.GROUP_SMART_THROUGHPUT_URL)
+    var groupSmartHealthInterval by profileCacheStore.stringToInt(Key.GROUP_SMART_HEALTH_INTERVAL) { 15 }
+    var groupSmartThroughputInterval by profileCacheStore.stringToInt(Key.GROUP_SMART_THROUGHPUT_INTERVAL) { 120 }
+    var groupSmartSwitchDelta by profileCacheStore.string(Key.GROUP_SMART_SWITCH_DELTA) { "8.0" }
+    var groupSmartMinSwitchInterval by profileCacheStore.stringToInt(Key.GROUP_SMART_MIN_SWITCH_INTERVAL) { 120 }
+    var groupSmartFailureThreshold by profileCacheStore.stringToInt(Key.GROUP_SMART_FAILURE_THRESHOLD) { 3 }
+    var groupSmartLatencyWeight by profileCacheStore.string(Key.GROUP_SMART_LATENCY_WEIGHT) { "0.08" }
+    var groupSmartJitterWeight by profileCacheStore.string(Key.GROUP_SMART_JITTER_WEIGHT) { "0.08" }
+    var groupSmartThroughputWeight by profileCacheStore.string(Key.GROUP_SMART_THROUGHPUT_WEIGHT) { "0.28" }
+    var groupSmartSuccessWeight by profileCacheStore.string(Key.GROUP_SMART_SUCCESS_WEIGHT) { "0.20" }
+    var groupSmartStabilityWeight by profileCacheStore.string(Key.GROUP_SMART_STABILITY_WEIGHT) { "0.30" }
+    var groupSmartFailureWeight by profileCacheStore.string(Key.GROUP_SMART_FAILURE_WEIGHT) { "0.06" }
 
     var subscriptionLink by profileCacheStore.string(Key.SUBSCRIPTION_LINK)
     var subscriptionForceResolve by profileCacheStore.boolean(Key.SUBSCRIPTION_FORCE_RESOLVE)

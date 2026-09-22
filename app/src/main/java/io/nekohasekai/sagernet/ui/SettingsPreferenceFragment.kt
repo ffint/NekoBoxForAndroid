@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.ui
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
@@ -10,6 +11,7 @@ import androidx.core.app.ActivityCompat
 import androidx.preference.*
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.Key
+import io.nekohasekai.sagernet.IPv6Mode
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
@@ -62,7 +64,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             true
         }
         val mixedPort = findPreference<EditTextPreference>(Key.MIXED_PORT)!!
-        val serviceMode = findPreference<Preference>(Key.SERVICE_MODE)!!
+        val serviceMode = findPreference<SimpleMenuPreference>(Key.SERVICE_MODE)!!
         val allowAccess = findPreference<Preference>(Key.ALLOW_ACCESS)!!
         val appendHttpProxy = findPreference<SwitchPreference>(Key.APPEND_HTTP_PROXY)!!
 
@@ -72,6 +74,11 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
         val bypassLan = findPreference<SwitchPreference>(Key.BYPASS_LAN)!!
         val bypassLanInCore = findPreference<SwitchPreference>(Key.BYPASS_LAN_IN_CORE)!!
+        val strictPrivacy = findPreference<SwitchPreference>(Key.STRICT_PRIVACY_MODE)!!
+        val strictVpnLockdown = findPreference<Preference>(Key.STRICT_VPN_LOCKDOWN)!!
+        val enableBlockRuleSets =
+            findPreference<SwitchPreference>(Key.ENABLE_BLOCK_RULESETS)!!
+        val blockRuleSets = findPreference<EditTextPreference>(Key.BLOCK_RULESETS)!!
 
         val remoteDns = findPreference<EditTextPreference>(Key.REMOTE_DNS)!!
         val directDns = findPreference<EditTextPreference>(Key.DIRECT_DNS)!!
@@ -123,6 +130,27 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             newValue
         }
 
+        strictPrivacy.setOnPreferenceChangeListener { _, newValue ->
+            if (newValue as Boolean) {
+                // Strict privacy applies only to VPN-captured traffic.
+                DataStore.serviceMode = Key.MODE_VPN
+                serviceMode.value = Key.MODE_VPN
+                DataStore.enableDnsRouting = true
+                DataStore.enableFakeDns = true
+                DataStore.bypassLan = false
+                DataStore.bypassLanInCore = false
+                if (DataStore.ipv6Mode == IPv6Mode.DISABLE) {
+                    DataStore.ipv6Mode = IPv6Mode.ENABLE
+                }
+            }
+            needReload()
+            true
+        }
+        strictVpnLockdown.setOnPreferenceClickListener {
+            startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+            true
+        }
+
         val profileTrafficStatistics =
             findPreference<SwitchPreference>(Key.PROFILE_TRAFFIC_STATISTICS)!!
         val speedInterval = findPreference<SimpleMenuPreference>(Key.SPEED_INTERVAL)!!
@@ -133,9 +161,13 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             true
         }
 
-        serviceMode.setOnPreferenceChangeListener { _, _ ->
-            if (DataStore.serviceState.started) SagerNet.stopService()
-            true
+        serviceMode.setOnPreferenceChangeListener { _, newValue ->
+            if (DataStore.strictPrivacyMode && newValue.toString() != Key.MODE_VPN) {
+                false
+            } else {
+                if (DataStore.serviceState.started) SagerNet.stopService()
+                true
+            }
         }
 
         val tunImplementation = findPreference<SimpleMenuPreference>(Key.TUN_IMPLEMENTATION)!!
@@ -160,6 +192,8 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         remoteDns.onPreferenceChangeListener = reloadListener
         directDns.onPreferenceChangeListener = reloadListener
         enableDnsRouting.onPreferenceChangeListener = reloadListener
+        enableBlockRuleSets.onPreferenceChangeListener = reloadListener
+        blockRuleSets.onPreferenceChangeListener = reloadListener
 
         ipv6Mode.onPreferenceChangeListener = reloadListener
         allowAccess.onPreferenceChangeListener = reloadListener

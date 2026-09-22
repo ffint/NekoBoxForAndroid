@@ -17,6 +17,7 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.plugin.PluginManager
+import io.nekohasekai.sagernet.smart.SmartGroupManager
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -147,6 +148,16 @@ class BaseService {
                 return Libcore.urlTest(
                     data!!.proxy!!.box, DataStore.connectionTestURL, 3000
                 )
+            } catch (e: Exception) {
+                error(Protocols.genFriendlyMsg(e.readableMessage))
+            }
+        }
+
+        override fun privacyProbe(timeoutMillis: Int): String {
+            val proxy = data?.proxy ?: error("core not started")
+            if (!proxy.isInitialized()) error("core not started")
+            return try {
+                Libcore.privacyProbeJSONForInstance(proxy.box, timeoutMillis)
             } catch (e: Exception) {
                 error(Protocols.genFriendlyMsg(e.readableMessage))
             }
@@ -286,6 +297,9 @@ class BaseService {
                         Logs.d("Network changed: $oldName -> $upstreamInterfaceName")
                         if (DataStore.networkChangeResetConnections) {
                             Libcore.resetAllConnections(true)
+                        }
+                        runOnDefaultDispatcher {
+                            SmartGroupManager.onNetworkChanged()
                         }
                     }
                 }

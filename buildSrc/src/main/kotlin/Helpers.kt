@@ -118,12 +118,16 @@ fun Project.setupAppCommon() {
     val keystorePwd = lp.getProperty("KEYSTORE_PASS") ?: System.getenv("KEYSTORE_PASS")
     val alias = lp.getProperty("ALIAS_NAME") ?: System.getenv("ALIAS_NAME")
     val pwd = lp.getProperty("ALIAS_PASS") ?: System.getenv("ALIAS_PASS")
+    val keystorePath = lp.getProperty("KEYSTORE_FILE")
+        ?: System.getenv("KEYSTORE_FILE")
+        ?: "enhanced-release.keystore"
+    val keystoreFile = rootProject.file(keystorePath)
 
     android.apply {
-        if (keystorePwd != null) {
+        if (keystorePwd != null && alias != null && pwd != null && keystoreFile.exists()) {
             signingConfigs {
                 create("release") {
-                    storeFile = rootProject.file("release.keystore")
+                    storeFile = keystoreFile
                     storePassword = keystorePwd
                     keyAlias = alias
                     keyPassword = pwd
@@ -197,10 +201,10 @@ fun Project.setupApp() {
                 outputFileName = if (isPreview) {
                     outputFileName.replace(
                         project.name,
-                        "NekoBox-" + requireMetadata().getProperty("PRE_VERSION_NAME")
+                        "NekoBox-Enhanced-" + requireMetadata().getProperty("PRE_VERSION_NAME")
                     ).replace("-preview", "")
                 } else {
-                    outputFileName.replace(project.name, "NekoBox-$versionName")
+                    outputFileName.replace(project.name, "NekoBox-Enhanced-$versionName")
                         .replace("-release", "")
                         .replace("-oss", "")
                 }

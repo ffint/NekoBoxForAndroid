@@ -16,7 +16,15 @@ import kotlin.coroutines.suspendCoroutine
 class TestInstance(profile: ProxyEntity, val link: String, private val timeout: Int) :
     BoxInstance(profile) {
 
-    suspend fun doTest(): Int {
+    suspend fun doTest(): Int = runBoxTest {
+        Libcore.urlTest(box, link, timeout)
+    }
+
+    suspend fun doThroughputTest(maxBytes: Long): String = runBoxTest {
+        Libcore.throughputTestJSON(box, link, timeout, maxBytes)
+    }
+
+    private suspend fun <T> runBoxTest(action: () -> T): T {
         return suspendCoroutine { c ->
             processes = GuardedProcessPool {
                 Logs.w(it)
@@ -31,7 +39,7 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
                             // wait for plugin start
                             delay(500)
                         }
-                        c.tryResume(Libcore.urlTest(box, link, timeout))
+                        c.tryResume(action())
                     } catch (e: Exception) {
                         c.tryResumeWithException(e)
                     }

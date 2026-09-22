@@ -1,6 +1,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_app_groups"
+        android:title="@string/app_groups"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_invert_selections"
         android:title="@string/invert_selections"
         app:showAsAction="never" />

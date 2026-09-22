@@ -4,8 +4,8 @@ const val CONNECTION_TEST_URL = "http://cp.cloudflare.com/"
 
 object Key {
 
-    const val DB_PUBLIC = "configuration.db"
-    const val DB_PROFILE = "sager_net.db"
+    const val DB_PUBLIC = "configuration_enhanced.db"
+    const val DB_PROFILE = "nekobox_enhanced.db"
 
     const val PERSIST_ACROSS_REBOOT = "isAutoConnect"
 
@@ -22,12 +22,17 @@ object Key {
     const val DIRECT_DNS = "directDns"
     const val ENABLE_DNS_ROUTING = "enableDnsRouting"
     const val ENABLE_FAKEDNS = "enableFakeDns"
+    const val STRICT_PRIVACY_MODE = "strictPrivacyMode"
+    const val STRICT_VPN_LOCKDOWN = "strictVpnLockdown"
+    const val ENABLE_BLOCK_RULESETS = "enableBlockRuleSets"
+    const val BLOCK_RULESETS = "blockRuleSets"
 
     const val IPV6_MODE = "ipv6Mode"
 
     const val PROXY_APPS = "proxyApps"
     const val BYPASS_MODE = "bypassMode"
     const val INDIVIDUAL = "individual"
+    const val APP_GROUPS = "appGroups"
     const val METERED_NETWORK = "meteredNetwork"
 
     const val TRAFFIC_SNIFFING = "trafficSniffing"
@@ -137,6 +142,22 @@ object Key {
     const val GROUP_FRONT_PROXY = "groupFrontProxy"
     const val GROUP_LANDING_PROXY = "groupLandingProxy"
 
+    const val GROUP_SMART = "groupSmart"
+    const val GROUP_SMART_AUTO_SELECT = "groupSmartAutoSelect"
+    const val GROUP_SMART_LATENCY_URL = "groupSmartLatencyUrl"
+    const val GROUP_SMART_THROUGHPUT_URL = "groupSmartThroughputUrl"
+    const val GROUP_SMART_HEALTH_INTERVAL = "groupSmartHealthInterval"
+    const val GROUP_SMART_THROUGHPUT_INTERVAL = "groupSmartThroughputInterval"
+    const val GROUP_SMART_SWITCH_DELTA = "groupSmartSwitchDelta"
+    const val GROUP_SMART_MIN_SWITCH_INTERVAL = "groupSmartMinSwitchInterval"
+    const val GROUP_SMART_FAILURE_THRESHOLD = "groupSmartFailureThreshold"
+    const val GROUP_SMART_LATENCY_WEIGHT = "groupSmartLatencyWeight"
+    const val GROUP_SMART_JITTER_WEIGHT = "groupSmartJitterWeight"
+    const val GROUP_SMART_THROUGHPUT_WEIGHT = "groupSmartThroughputWeight"
+    const val GROUP_SMART_SUCCESS_WEIGHT = "groupSmartSuccessWeight"
+    const val GROUP_SMART_STABILITY_WEIGHT = "groupSmartStabilityWeight"
+    const val GROUP_SMART_FAILURE_WEIGHT = "groupSmartFailureWeight"
+
     const val GROUP_SUBSCRIPTION = "groupSubscription"
     const val SUBSCRIPTION_LINK = "subscriptionLink"
     const val SUBSCRIPTION_FORCE_RESOLVE = "subscriptionForceResolve"
@@ -169,6 +190,7 @@ object IPv6Mode {
 object GroupType {
     const val BASIC = 0
     const val SUBSCRIPTION = 1
+    const val SMART = 2
 }
 
 object GroupOrder {
@@ -178,10 +200,10 @@ object GroupOrder {
 }
 
 object Action {
-    const val SERVICE = "io.nekohasekai.sagernet.SERVICE"
-    const val CLOSE = "io.nekohasekai.sagernet.CLOSE"
-    const val RELOAD = "io.nekohasekai.sagernet.RELOAD"
+    const val SERVICE = "moe.nb4a.enhanced.SERVICE"
+    const val CLOSE = "moe.nb4a.enhanced.CLOSE"
+    const val RELOAD = "moe.nb4a.enhanced.RELOAD"
 
-    // const val SWITCH_WAKE_LOCK = "io.nekohasekai.sagernet.SWITCH_WAKELOCK"
-    const val RESET_UPSTREAM_CONNECTIONS = "moe.nb4a.RESET_UPSTREAM_CONNECTIONS"
+    // Keep Enhanced broadcasts isolated from the official NekoBox process.
+    const val RESET_UPSTREAM_CONNECTIONS = "moe.nb4a.enhanced.RESET_UPSTREAM_CONNECTIONS"
 }

@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.database
 
 import io.nekohasekai.sagernet.GroupType
+import io.nekohasekai.sagernet.bg.SmartGroupUpdater
 import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 
@@ -56,6 +57,8 @@ object GroupManager {
     suspend fun clearGroup(groupId: Long) {
         DataStore.selectedProxy = 0L
         SagerDatabase.proxyDao.deleteAll(groupId)
+        SagerDatabase.smartNodeDao.deleteByGroup(groupId)
+        SagerDatabase.smartGroupDao.resetSelection(groupId)
         iterator { groupUpdated(groupId) }
     }
 
@@ -86,29 +89,41 @@ object GroupManager {
         if (group.type == GroupType.SUBSCRIPTION) {
             SubscriptionUpdater.reconfigureUpdater()
         }
+        if (group.type == GroupType.SMART) {
+            SmartGroupUpdater.reconfigureUpdater()
+        }
         return group
     }
 
     suspend fun updateGroup(group: ProxyGroup) {
         SagerDatabase.groupDao.updateGroup(group)
         iterator { groupUpdated(group) }
-        if (group.type == GroupType.SUBSCRIPTION) {
-            SubscriptionUpdater.reconfigureUpdater()
-        }
+        // Reconfigure unconditionally because a group may have just changed
+        // away from SUBSCRIPTION, in which case the old worker must be removed.
+        SubscriptionUpdater.reconfigureUpdater()
+        SmartGroupUpdater.reconfigureUpdater()
     }
 
     suspend fun deleteGroup(groupId: Long) {
         SagerDatabase.groupDao.deleteById(groupId)
         SagerDatabase.proxyDao.deleteByGroup(groupId)
+        SagerDatabase.smartGroupDao.delete(groupId)
+        SagerDatabase.smartNodeDao.deleteByGroup(groupId)
         iterator { groupRemoved(groupId) }
         SubscriptionUpdater.reconfigureUpdater()
+        SmartGroupUpdater.reconfigureUpdater()
     }
 
     suspend fun deleteGroup(group: List<ProxyGroup>) {
         SagerDatabase.groupDao.deleteGroup(group)
         SagerDatabase.proxyDao.deleteByGroup(group.map { it.id }.toLongArray())
-        for (proxyGroup in group) iterator { groupRemoved(proxyGroup.id) }
+        for (proxyGroup in group) {
+            SagerDatabase.smartGroupDao.delete(proxyGroup.id)
+            SagerDatabase.smartNodeDao.deleteByGroup(proxyGroup.id)
+            iterator { groupRemoved(proxyGroup.id) }
+        }
         SubscriptionUpdater.reconfigureUpdater()
+        SmartGroupUpdater.reconfigureUpdater()
     }
 
 }

@@ -23,6 +23,7 @@ import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
 import io.nekohasekai.sagernet.fmt.toUniversalLink
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.smart.SmartGroupManager
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.QRCodeDialog
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
@@ -361,6 +362,17 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                     startFilesForResult(exportProfiles, "profiles_${proxyGroup.displayName()}.txt")
                 }
 
+                R.id.action_smart_full_test -> {
+                    launchSmartGroupTest(proxyGroup.id, fullTest = true) { result ->
+                        result.onSuccess {
+                            bind(proxyGroup)
+                        }.onFailure {
+                            Logs.e("Smart Group full test failed", it)
+                            snackbar(it.readableMessage).show()
+                        }
+                    }
+                }
+
                 R.id.action_clear -> {
                     MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                         .setMessage(R.string.clear_profiles_message)
@@ -384,7 +396,10 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             itemView.setOnClickListener { }
 
             editButton.isGone = proxyGroup.ungrouped
-            updateButton.isInvisible = proxyGroup.type != GroupType.SUBSCRIPTION
+            updateButton.isInvisible = proxyGroup.type == GroupType.BASIC
+            updateButton.setText(
+                if (proxyGroup.type == GroupType.SMART) R.string.smart_quick_test else R.string.group_update
+            )
             groupName.text = proxyGroup.displayName()
 
             editButton.setOnClickListener {
@@ -394,7 +409,19 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
 
             updateButton.setOnClickListener {
-                GroupUpdater.startUpdate(proxyGroup, true)
+                when (proxyGroup.type) {
+                    GroupType.SUBSCRIPTION -> GroupUpdater.startUpdate(proxyGroup, true)
+                    GroupType.SMART -> {
+                        launchSmartGroupTest(proxyGroup.id, fullTest = false) { result ->
+                            result.onSuccess {
+                                bind(proxyGroup)
+                            }.onFailure {
+                                Logs.e("Smart Group quick test failed", it)
+                                snackbar(it.readableMessage).show()
+                            }
+                        }
+                    }
+                }
             }
 
             optionsButton.setOnClickListener {
@@ -405,6 +432,9 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 if (proxyGroup.type != GroupType.SUBSCRIPTION) {
                     popup.menu.removeItem(R.id.action_share_subscription)
+                }
+                if (proxyGroup.type != GroupType.SMART) {
+                    popup.menu.removeItem(R.id.action_smart_full_test)
                 }
                 popup.setOnMenuItemClickListener(this)
                 popup.show()
@@ -435,7 +465,10 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 }
 
                 subscriptionUpdateProgress.isVisible = false
-                updateButton.isInvisible = proxyGroup.type != GroupType.SUBSCRIPTION
+                updateButton.isInvisible = proxyGroup.type == GroupType.BASIC
+                updateButton.setText(
+                    if (proxyGroup.type == GroupType.SMART) R.string.smart_test else R.string.group_update
+                )
                 editButton.isGone = proxyGroup.ungrouped
             }
 
@@ -534,7 +567,14 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                                     "${date.month + 1} - ${date.date}"
                                 )
                             }
+                        }
 
+                        GroupType.SMART -> {
+                            groupStatus.text = if (size == 0L) {
+                                getString(R.string.group_status_empty)
+                            } else {
+                                getString(R.string.group_status_smart, size)
+                            }
                         }
                     }
                 }

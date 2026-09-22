@@ -13,6 +13,8 @@ rm -rf $BUILD/android \
 if [ -z "$GOPATH" ]; then
   GOPATH=$(go env GOPATH)
 fi
+export GOPATH
+export PATH="$GOPATH/bin:$PATH"
 
 export GOBIND=gobind-matsuri
 "$GOPATH"/bin/gomobile-matsuri bind -v -androidapi 21 -cache "$(realpath $BUILD)" -trimpath -ldflags='-s -w' -tags='with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' . || exit 1

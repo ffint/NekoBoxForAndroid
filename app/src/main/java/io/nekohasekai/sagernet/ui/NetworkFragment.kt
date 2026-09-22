@@ -15,6 +15,9 @@ class NetworkFragment : NamedFragment(R.layout.layout_network) {
         super.onViewCreated(view, savedInstanceState)
 
         val binding = LayoutNetworkBinding.bind(view)
+        binding.privacyTest.setOnClickListener {
+            startActivity(Intent(requireContext(), PrivacyTestActivity::class.java))
+        }
         binding.stunTest.setOnClickListener {
             startActivity(Intent(requireContext(), StunActivity::class.java))
         }

@@ -25,6 +25,9 @@
         </menu>
     </item>
     <item
+        android:id="@+id/action_smart_full_test"
+        android:title="@string/smart_full_test" />
+    <item
         android:id="@+id/action_clear"
         android:title="@string/clear_profiles" />
 </menu>
